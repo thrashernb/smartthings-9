@@ -25,6 +25,10 @@ metadata {
 		command "setAdjustedColor"
                 command "reset"        
                 command "refresh"
+                command "on2"
+                command "off2"
+                command "setLevel2"
+                command "setColor2"
 	}
 
 	simulator {
@@ -47,6 +51,21 @@ metadata {
 			}
 		}
 
+		multiAttributeTile(name:"switch2", type: "lighting", width: 6, height: 4, canChangeIcon: true){
+			tileAttribute ("device.switch2", key: "PRIMARY_CONTROL") {
+				attributeState "on", label:'2nd Color', action:"off2", icon:"st.lights.philips.hue-single", backgroundColor:"#79b821", nextState:"turningOff"
+				attributeState "off", label:'2nd Color', action:"on2", icon:"st.lights.philips.hue-single", backgroundColor:"#ffffff", nextState:"turningOn"
+				attributeState "turningOn", label:'Turning On', action:"off2", icon:"st.lights.philips.hue-single", backgroundColor:"#ffffff", nextState:"turningOff"
+				attributeState "turningOff", label:'Turning Off', action:"on2", icon:"st.lights.philips.hue-single", backgroundColor:"#ffffff", nextState:"turningOn"
+			}
+			tileAttribute ("device.level2", key: "SLIDER_CONTROL") {
+				attributeState "level", action:"setLevel2"
+			}
+			tileAttribute ("device.color2", key: "COLOR_CONTROL") {
+				attributeState "color", action:"setColor2"
+			}
+		}
+
 		standardTile("reset", "device.reset", inactiveLabel: false, decoration: "flat", width: 2, height: 2) {
 			state "default", label:"Reset Color", action:"reset", icon:"st.lights.philips.hue-single"
 		}
@@ -56,58 +75,58 @@ metadata {
 	}
 
 	main(["switch"])
-	details(["switch", "levelSliderControl", "rgbSelector", "refresh", "reset"])
+	details(["switch", "switch2", "refresh", "reset"])
 }
 
 // parse events into attributes
 def parse(description) {
-	log.debug "parse() - $description"
+	//log.debug "parse() - $description"
 	def results = []
+    def msg = parseLanMessage(description)
+    def json = msg.json
+    //log.debug "Result: $msg"
+    if (msg.status == 200) {
+    	//log.debug "Result: $json"
+        //results << createEvent(name: "switch", value: json.enabled)
+        json.each {
+        	def n = it.getKey()
+        	if (n != "status") {
+            	def v = it.getValue()
+        		results << createEvent(name: n, value: v)
+        		log.debug "Status: $n = $v"
+        	}
+        }
+    }
 	results
 }
 
 // handle commands
-def on() {
-	sendEvent(name: "switch", value: "on")
+def on() { POST([switch: "on"]) }
+def off() {	POST([switch: "off"]) }
+def setLevel(percent) { POST([level: percent]) }
+def setColor(value) {
+	log.debug "setColor: ${value}, $this"
+    POST([color: value.hex])
 }
 
-def off() {
-	sendEvent(name: "switch", value: "off")
+
+def on2() { POST([switch2: "on"]) }
+def off2() { POST([switch2: "off"]) }
+def setLevel2(percent) { POST([level: percent]) }
+def setColor2(value) {
+	log.debug "setColor: ${value}, $this"
+    POST([color2: value.hex])
 }
 
-def nextLevel() {
-	def level = device.latestValue("level") as Integer ?: 0
-	if (level <= 100) {
-		level = Math.min(25 * (Math.round(level / 25) + 1), 100) as Integer
-	}
-	else {
-		level = 25
-	}
-	setLevel(level)
-}
-
-def setLevel(percent) {
-	log.debug "setLevel($level)"
-	sendEvent(name: "level", value: percent)
-}
 
 def setSaturation(percent) {
 	log.debug "setSaturation($percent)"
-	sendEvent(name: "saturation", value: percent)
+	//sendEvent(name: "saturation", value: percent)
 }
 
 def setHue(percent) {
 	log.debug "setHue($percent)"
-	sendEvent(name: "hue", value: percent)
-}
-
-def setColor(value) {
-	log.debug "setColor: ${value}, $this"
-	if (value.hue) { sendEvent(name: "hue", value: value.hue)}
-	if (value.saturation) { sendEvent(name: "saturation", value: value.saturation)}
-	if (value.hex) { sendEvent(name: "color", value: value.hex)}
-	if (value.level) { sendEvent(name: "level", value: value.level)}
-	if (value.switch) { sendEvent(name: "switch", value: value.switch)}
+	//sendEvent(name: "hue", value: percent)
 }
 
 def reset() {
@@ -120,7 +139,7 @@ def setAdjustedColor(value) {
 	if (value) {
         log.trace "setAdjustedColor: ${value}"
         def adjusted = value + [:]
-        // Needed because color picker always sends 100
+        // Needed because color picker always sends 1.00
         adjusted.level = null 
         setColor(adjusted)
     }
@@ -128,6 +147,7 @@ def setAdjustedColor(value) {
 
 def refresh() {
 	log.debug "Executing 'refresh'"
+    GET()
 }
 
 def rgbToHSV(red, green, blue) {
@@ -166,4 +186,42 @@ def huesatToRGB(float hue, float sat) {
 		case 4: return [t, p, 255]
 		case 5: return [255, p, q]
 	}
+}
+
+
+private GET() {
+  log.debug("Executing get api to " + getHostAddress())
+  def hubAction = new physicalgraph.device.HubAction(
+    method: "GET",
+	path: "/status",
+    headers: [HOST:getHostAddress()]
+  )
+  return hubAction
+}
+private POST(args=[]) {
+	log.debug("Executing ${uri}, args=${args}")
+	def hubAction = [new physicalgraph.device.HubAction(
+		method: "POST",
+		path: "/control",
+		body: args,
+		headers: [Host:getHostAddress() ]
+		)] //, delayAction(100)]
+	return hubAction
+}
+//helper methods
+private delayAction(long time) {
+	new physicalgraph.device.HubAction("delay $time")
+}
+private Integer convertHexToInt(hex) {
+	Integer.parseInt(hex,16)
+}
+private String convertHexToIP(hex) {
+	[convertHexToInt(hex[0..1]),convertHexToInt(hex[2..3]),convertHexToInt(hex[4..5]),convertHexToInt(hex[6..7])].join(".")
+}
+
+private getHostAddress() {
+	def parts = device.deviceNetworkId.split(":")
+	def ip = convertHexToIP(parts[0])
+	def port = convertHexToInt(parts[1])
+	return ip + ":" + port
 }
