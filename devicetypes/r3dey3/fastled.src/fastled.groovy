@@ -25,8 +25,6 @@ metadata {
 		command "setColor"
         command "reset"        
         command "refresh"
-        command "on2"
-        command "off2"
         command "setLevel2"
         command "setColor2"
         command "nextMode"
@@ -80,31 +78,6 @@ metadata {
     
 }
 
-def nextMode() {
-	log.debug("Executing ${uri}, args=${args}")
-	def hubAction = [new physicalgraph.device.HubAction(
-		method: "POST",
-		path: "/next_mode",
-		body: [],
-		headers: [Host:getHostAddress() ]
-		)]
-	return hubAction
-
-	log.debug "nextMode"
-  	if (device.currentValue("mode") == "single_color") {
-    	sendEvent(name:"mode", value:"dual_color")
-        state.mode = "dual_color"
-    }
-  	else if (device.currentValue("mode") == "dual_color") {
-    	sendEvent(name:"mode", value:"rainbow")
-        state.mode = "rainbow"
-    }
-    else {
-    	sendEvent(name:"mode", value:"single_color")
-        state.mode = "single_color"
-    }
-}
-
 // parse events into attributes
 def parse(description) {
 	//log.debug "parse() - $description"
@@ -128,6 +101,18 @@ def parse(description) {
 }
 
 // handle commands
+def nextMode() {
+	log.debug "nextMode()"
+	log.debug("Executing ${uri}, args=${args}")
+	def hubAction = [new physicalgraph.device.HubAction(
+		method: "POST",
+		path: "/next_mode",
+		body: [],
+		headers: [Host:getHostAddress() ]
+		)]
+	return hubAction
+}
+
 def on() { POST([switch: "on"]) }
 def off() {	POST([switch: "off"]) }
 
@@ -162,43 +147,6 @@ def poll() {
 	refresh()
 }
 
-def rgbToHSV(red, green, blue) {
-	float r = red / 255f
-	float g = green / 255f
-	float b = blue / 255f
-	float max = [r, g, b].max()
-	float delta = max - [r, g, b].min()
-	def hue = 13
-	def saturation = 0
-	if (max && delta) {
-		saturation = 100 * delta / max
-		if (r == max) {
-			hue = ((g - b) / delta) * 100 / 6
-		} else if (g == max) {
-			hue = (2 + (b - r) / delta) * 100 / 6
-		} else {
-			hue = (4 + (r - g) / delta) * 100 / 6
-		}
-	}
-	[hue: hue, saturation: saturation, value: max * 100]
-}
-
-def huesatToRGB(float hue, float sat) {
-	while(hue >= 100) hue -= 100
-	int h = (int)(hue / 100 * 6)
-	float f = hue / 100 * 6 - h
-	int p = Math.round(255 * (1 - (sat / 100)))
-	int q = Math.round(255 * (1 - (sat / 100) * f))
-	int t = Math.round(255 * (1 - (sat / 100) * (1 - f)))
-	switch (h) {
-		case 0: return [255, t, p]
-		case 1: return [q, 255, p]
-		case 2: return [p, 255, t]
-		case 3: return [p, q, 255]
-		case 4: return [t, p, 255]
-		case 5: return [255, p, q]
-	}
-}
 
 
 private GET() {
@@ -230,7 +178,6 @@ private Integer convertHexToInt(hex) {
 private String convertHexToIP(hex) {
 	[convertHexToInt(hex[0..1]),convertHexToInt(hex[2..3]),convertHexToInt(hex[4..5]),convertHexToInt(hex[6..7])].join(".")
 }
-
 private getHostAddress() {
 	def parts = device.deviceNetworkId.split(":")
 	def ip = convertHexToIP(parts[0])
