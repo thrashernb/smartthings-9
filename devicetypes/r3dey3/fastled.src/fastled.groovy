@@ -12,7 +12,6 @@
  *
  *  Author: Kenny K
  */
-
 metadata {
 	definition (name: "FastLed", namespace: "r3dey3", author: "Kenny Keslar") {
 		capability "Switch Level"
@@ -21,14 +20,17 @@ metadata {
 		capability "Switch"
 		capability "Refresh"
 		capability "Sensor"
-
-		command "setAdjustedColor"
-                command "reset"        
-                command "refresh"
-                command "on2"
-                command "off2"
-                command "setLevel2"
-                command "setColor2"
+        capability "Polling"
+        
+		command "setColor"
+        command "reset"        
+        command "refresh"
+        command "on2"
+        command "off2"
+        command "setLevel2"
+        command "setColor2"
+        command "nextMode"
+        attribute "mode", "enum", ["single_color", "dual_color", "rainbow", "changing"]
 	}
 
 	simulator {
@@ -38,31 +40,31 @@ metadata {
 	tiles (scale: 2){
 		multiAttributeTile(name:"switch", type: "lighting", width: 6, height: 4, canChangeIcon: true){
 			tileAttribute ("device.switch", key: "PRIMARY_CONTROL") {
-				attributeState "on", label:'${name}', action:"switch.off", icon:"st.lights.philips.hue-single", backgroundColor:"#79b821", nextState:"turningOff"
-				attributeState "off", label:'${name}', action:"switch.on", icon:"st.lights.philips.hue-single", backgroundColor:"#ffffff", nextState:"turningOn"
-				attributeState "turningOn", label:'${name}', action:"switch.off", icon:"st.lights.philips.hue-single", backgroundColor:"#79b821", nextState:"turningOff"
-				attributeState "turningOff", label:'${name}', action:"switch.on", icon:"st.lights.philips.hue-single", backgroundColor:"#ffffff", nextState:"turningOn"
+				attributeState "on", label:'${name}', action:"switch.off", icon:"st.lighting.light21", backgroundColor:"#79b821", nextState:"turningOff"
+				attributeState "off", label:'${name}', action:"switch.on", icon:"st.lighting.light21", backgroundColor:"#ffffff", nextState:"turningOn"
+				attributeState "turningOn", label:'${name}', action:"switch.off", icon:"st.lighting.light21", backgroundColor:"#79b821", nextState:"turningOff"
+				attributeState "turningOff", label:'${name}', action:"switch.on", icon:"st.lighting.light21", backgroundColor:"#ffffff", nextState:"turningOn"
 			}
 			tileAttribute ("device.level", key: "SLIDER_CONTROL") {
 				attributeState "level", action:"switch level.setLevel"
 			}
 			tileAttribute ("device.color", key: "COLOR_CONTROL") {
-				attributeState "color", action:"setAdjustedColor"
+				attributeState "color", action:"setColor"
 			}
 		}
 
-		multiAttributeTile(name:"switch2", type: "lighting", width: 6, height: 4, canChangeIcon: true){
-			tileAttribute ("device.switch2", key: "PRIMARY_CONTROL") {
-				attributeState "on", label:'2nd Color', action:"off2", icon:"st.lights.philips.hue-single", backgroundColor:"#79b821", nextState:"turningOff"
-				attributeState "off", label:'2nd Color', action:"on2", icon:"st.lights.philips.hue-single", backgroundColor:"#ffffff", nextState:"turningOn"
-				attributeState "turningOn", label:'Turning On', action:"off2", icon:"st.lights.philips.hue-single", backgroundColor:"#ffffff", nextState:"turningOff"
-				attributeState "turningOff", label:'Turning Off', action:"on2", icon:"st.lights.philips.hue-single", backgroundColor:"#ffffff", nextState:"turningOn"
+		multiAttributeTile(name:"switch2", type: "lighting", width: 6, height: 4){
+			tileAttribute ("mode", key: "PRIMARY_CONTROL") {
+                attributeState "single_color", label: "Single Color", action: "nextMode", icon:"st.secondary.tools", nextState:"changing"
+                attributeState "dual_color", label: "Dual Color", action: "nextMode", icon:"st.secondary.tools", nextState:"changing"
+                attributeState "rainbow", label: "Rainbow", action: "nextMode", icon:"st.secondary.tools", nextState:"changing"
+                attributeState "changing", label: "Changing Mode"
 			}
 			tileAttribute ("device.level2", key: "SLIDER_CONTROL") {
-				attributeState "level", action:"setLevel2"
+				attributeState "level2", action:"setLevel2"
 			}
 			tileAttribute ("device.color2", key: "COLOR_CONTROL") {
-				attributeState "color", action:"setColor2"
+				attributeState "color2", action:"setColor2"
 			}
 		}
 
@@ -73,9 +75,34 @@ metadata {
 			state "default", label:"", action:"refresh.refresh", icon:"st.secondary.refresh"
 		}
 	}
-
 	main(["switch"])
 	details(["switch", "switch2", "refresh", "reset"])
+    
+}
+
+def nextMode() {
+	log.debug("Executing ${uri}, args=${args}")
+	def hubAction = [new physicalgraph.device.HubAction(
+		method: "POST",
+		path: "/next_mode",
+		body: [],
+		headers: [Host:getHostAddress() ]
+		)]
+	return hubAction
+
+	log.debug "nextMode"
+  	if (device.currentValue("mode") == "single_color") {
+    	sendEvent(name:"mode", value:"dual_color")
+        state.mode = "dual_color"
+    }
+  	else if (device.currentValue("mode") == "dual_color") {
+    	sendEvent(name:"mode", value:"rainbow")
+        state.mode = "rainbow"
+    }
+    else {
+    	sendEvent(name:"mode", value:"single_color")
+        state.mode = "single_color"
+    }
 }
 
 // parse events into attributes
@@ -92,7 +119,7 @@ def parse(description) {
         	def n = it.getKey()
         	if (n != "status") {
             	def v = it.getValue()
-        		results << createEvent(name: n, value: v)
+        		results << createEvent(name: n, value: v)//, displayed:false)
         		log.debug "Status: $n = $v"
         	}
         }
@@ -103,51 +130,36 @@ def parse(description) {
 // handle commands
 def on() { POST([switch: "on"]) }
 def off() {	POST([switch: "off"]) }
+
 def setLevel(percent) { POST([level: percent]) }
-def setColor(value) {
-	log.debug "setColor: ${value}, $this"
-    POST([color: value.hex])
-}
+def setColor(value) { POST(color_raw: [hue: value.hue, saturation:value.saturation], color: value.hex) }
 
-
-def on2() { POST([switch2: "on"]) }
-def off2() { POST([switch2: "off"]) }
-def setLevel2(percent) { POST([level: percent]) }
-def setColor2(value) {
-	log.debug "setColor: ${value}, $this"
-    POST([color2: value.hex])
-}
+def setLevel2(percent) { POST(level2: percent)}
+def setColor2(value) { POST(color2_raw: [hue: value.hue, saturation:value.saturation], color2: value.hex) }
 
 
 def setSaturation(percent) {
 	log.debug "setSaturation($percent)"
-	//sendEvent(name: "saturation", value: percent)
 }
 
 def setHue(percent) {
 	log.debug "setHue($percent)"
-	//sendEvent(name: "hue", value: percent)
 }
 
 def reset() {
 	log.debug "Executing 'reset'"
     def value = [level:100, hex:"#90C638", saturation:56, hue:23]
-    setAdjustedColor(value)
-}
-
-def setAdjustedColor(value) {
-	if (value) {
-        log.trace "setAdjustedColor: ${value}"
-        def adjusted = value + [:]
-        // Needed because color picker always sends 1.00
-        adjusted.level = null 
-        setColor(adjusted)
-    }
+    setColor(value)
+    setLevel(100)
 }
 
 def refresh() {
 	log.debug "Executing 'refresh'"
     GET()
+}
+
+def poll() {
+	refresh()
 }
 
 def rgbToHSV(red, green, blue) {
