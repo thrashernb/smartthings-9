@@ -59,8 +59,6 @@ class LedStrip(object):
 			self.buffer[led][1] = self.gamma[r]
 			self.buffer[led][2] = self.gamma[b]
 
-		self.update()
-
 	def set(self, pixel, r, g, b):
 		"""
 		Set a single LED a specific color
