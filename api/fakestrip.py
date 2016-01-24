@@ -1,33 +1,38 @@
-class LedStrip(object):
-	def __init__(self, leds=32, dev="/dev/spidev0.1"):
-		pass
-	def fill(self, r, g, b, start=0, end=0):
-		pass
-	def set(self, pixel, r, g, b):
-		pass
-	def update(self):
-		pass
-	
+#!/usr/bin/env python
+
 from Tkinter import *
 import colorsys
 import time
 import threading
-SIZE = 40
-NUM_LEDS=119
-DELAY = 100
-leds = []
+import itertools
+import sys
+import os
+from ledstrip import LedStrip
+from main import main
 
-for i in range(NUM_LEDS):
-    rgb = colorsys.hsv_to_rgb(i/120.0, 1.0, 1.0)
-    rgb = [ min(255, int(256*i)) for i in rgb ]
-    leds.append(rgb)
+__all__ = [
+    "FakeStrip"
+]
+
+SIZE=40
+DELAY=100
 
 
-class Application(Frame):
+class MyApp(Frame):
+    def __init__(self, strip=None, master=None):
+        Frame.__init__(self, master)
+        self.strip = strip
+        self.pack()
+        self.createWidgets()
+
+    def quit(self):
+        print "QUIT"
+        os._exit(0)
+
     def createWidgets(self):
         self.quit_button = Button(self)
-        self.quit_button["text"] = "QUIT"
-        self.quit_button["fg"]   = "red"
+        self.quit_button["text"] = "Quit"
+        #self.quit_button["fg"]   = "red"
         self.quit_button["command"] =  self.quit
         self.quit_button.pack({"side": "bottom"})
 
@@ -36,10 +41,10 @@ class Application(Frame):
         self.draw_leds()
         self.after(DELAY, self.draw_leds)
 
-    def draw_leds(self): 
+    def draw_leds(self):
         self.canvas.delete(ALL)
         #self.canvas.create_rectangle(1,1, (SIZE+5)*11, (SIZE+5)*11)
-        for i, led in enumerate(leds):
+        for i, led in enumerate(self.strip):
             row = i / 11
             col = i % 11
             if row & 1:
@@ -48,31 +53,22 @@ class Application(Frame):
             self.canvas.create_rectangle(col*(SIZE+5)+4, row*(SIZE+5)+4, col*(SIZE+5)+SIZE, row*(SIZE+5)+SIZE, fill=color)
         self.after(DELAY, self.draw_leds)
         self.update_idletasks()
-            
-    def __init__(self, master=None):
-        Frame.__init__(self, master)
-        self.pack()
-        self.createWidgets()
 
-def update_leds():
-    cnt = 0
-    while True:
-        time.sleep(0.100)
-        cnt += 1
-        #print cnt
-        for i in range(NUM_LEDS):
-            rgb = colorsys.hsv_to_rgb((i+cnt)/120.0%1, 1.0, 1.0)
-            rgb = [ min(255, int(256*c)) for c in rgb ]
-            leds[i] = rgb
+class FakeStrip(LedStrip):
+    def _run(self):
+        root = Tk()
+        app = MyApp(strip=self, master=root)
+        app.mainloop()
+        sys.exit(0)
 
+    def __init__(self, **kwargs):
+        super(FakeStrip, self).__init__(**kwargs)
+        self.gamma = range(256)
+        thread = threading.Thread(target=self._run)
+        thread.daemon = True
+        thread.start()
 
-thread = threading.Thread(target=update_leds)
-thread.daemon = True
-thread.start()
-
-root = Tk()
-app = Application(master=root)
-app.mainloop()
-root.destroy()
-sys.exit(0)
+if __name__ == "__main__":
+    strip = FakeStrip(num_leds=121)
+    main(strip)
 
