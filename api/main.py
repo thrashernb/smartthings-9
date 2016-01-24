@@ -1,17 +1,17 @@
 from flask import Flask
 from flask import request
 from flask_json import FlaskJSON, JsonError, json_response, as_json
-import ledstrip
+import sys
+#import ledstrip
 #import fakestrip as ledstrip
 import colorsys
 
-NUM_LEDS=120
 MODES = ["single_color", "dual_color", "rainbow"]
 
 app = Flask(__name__)
 FlaskJSON(app)
 
-strip = ledstrip.LedStrip(NUM_LEDS)
+#strip = ledstrip.LedStrip(NUM_LEDS)
 
 state = {
     "switch": "off",
@@ -42,8 +42,8 @@ def update(new_data = {}):
         if state["switch"] == "off":
             strip.fill(0,0,0)
         elif state["mode"] == "rainbow":
-            for i in range(0, NUM_LEDS):
-                rgb = colorsys.hsv_to_rgb(i/float(NUM_LEDS), state["level2"]/100.0, state["level"]/100.0)
+            for i in range(0, len(strip)):
+                rgb = colorsys.hsv_to_rgb(i/float(len(strip)), state["level2"]/100.0, state["level"]/100.0)
                 r, g, b = [ min(255, int(256*v)) for v in rgb ]
                 strip.set(i, r,g,b)
             strip.update()
@@ -51,7 +51,7 @@ def update(new_data = {}):
             r,g,b = color_to_rgb(0)
             strip.fill(r,g,b)
         elif state["mode"] == "dual_color":
-            split = int(NUM_LEDS*(state["level3"]/100.0))
+            split = int(len(strip)*(state["level3"]/100.0))
             r,g,b = color_to_rgb(0)
             strip.fill(r,g,b, 0, split)
 
@@ -90,7 +90,18 @@ def next_mode():
     print "Returning %r" % (ret)
     return ret
 
-if __name__ == "__main__":
+
+
+def main(strip):
+    globals()["strip"] = strip
     update()
     app.run(host="0.0.0.0",port=5001)
+    sys.exit(0)
+
+if __name__ == "__main__":
+    import lpd8806_strip
+    strip = lpd8806_strip.Lpd8806(num_leds=120)
+    main(strip)
+
+
 
