@@ -6,6 +6,7 @@ import ledstrip
 import colorsys
 
 NUM_LEDS=120
+MODES = ["single_color", "dual_color", "rainbow"]
 
 app = Flask(__name__)
 FlaskJSON(app)
@@ -16,12 +17,22 @@ state = {
     "switch": "off",
     "level": 100,
     "level2": 100,
-
+    "level3": 50,
     "color_raw": {"hue": 0.0, "saturation": 0.0},
     "color2_raw": {"hue": 0.0, "saturation": 0.0},
     "mode": "single_color"
 }
 
+
+def color_to_rgb(color_idx):
+    if color_idx == 0:
+        name = "color_raw"
+        level = "level"
+    else:
+        name = "color2_raw"
+        level = "level2"
+    rgb = colorsys.hsv_to_rgb(state[name]["hue"]/100.0, state[name]["saturation"]/100.0, state[level]/100.0)
+    return [ min(255, int(256*i)) for i in rgb ]
 
 def update(new_data = {}):
     global state
@@ -37,22 +48,19 @@ def update(new_data = {}):
                 strip.set(i, r,g,b)
             strip.update()
         elif state["mode"] == "single_color":
-            rgb = colorsys.hsv_to_rgb(state["color_raw"]["hue"]/100.0, state["color_raw"]["saturation"]/100.0, state["level"]/100.0)
-            r, g, b = [ min(255, int(256*i)) for i in rgb ]
+            r,g,b = color_to_rgb(0)
             strip.fill(r,g,b)
         elif state["mode"] == "dual_color":
-            rgb = colorsys.hsv_to_rgb(state["color_raw"]["hue"]/100.0, state["color_raw"]["saturation"]/100.0, state["level"]/100.0)
-            r, g, b = [ min(255, int(256*i)) for i in rgb ]
-            strip.fill(r,g,b, 0, NUM_LEDS/2)
+            split = int(NUM_LEDS*(state["level3"]/100.0))
+            r,g,b = color_to_rgb(0)
+            strip.fill(r,g,b, 0, split)
 
-            rgb = colorsys.hsv_to_rgb(state["color2_raw"]["hue"]/100.0, state["color2_raw"]["saturation"]/100.0, state["level2"]/100.0)
-            r2, g2, b2 = [ min(255, int(256*i)) for i in rgb ]
-            strip.fill(r2,g2,b2, NUM_LEDS/2)
-
+            r,g,b = color_to_rgb(1)
+            strip.fill(r,g,b, split)
     except Exception as e:
         print "ERROR: %r" % (e)
+    strip.update()
 
-MODES = ["single_color", "dual_color", "rainbow"]
 @app.route("/status")
 @as_json
 def get_status():
@@ -84,5 +92,5 @@ def next_mode():
 
 if __name__ == "__main__":
     update()
-    app.run(host="0.0.0.0")
+    app.run(host="0.0.0.0",port=5001)
 
