@@ -42,21 +42,24 @@ class MyApp(Frame):
         self.after(DELAY, self.draw_leds)
 
     def draw_leds(self):
-        self.canvas.delete(ALL)
-        #self.canvas.create_rectangle(1,1, (SIZE+5)*11, (SIZE+5)*11)
-        for i, led in enumerate(self.strip):
-            row = i / 11
-            col = i % 11
-            if row & 1:
-                col = 10 - col
-            color = "#" + ("{:02x}"*3).format(*led)
-            self.canvas.create_rectangle(col*(SIZE+5)+4, row*(SIZE+5)+4, col*(SIZE+5)+SIZE, row*(SIZE+5)+SIZE, fill=color)
+        if self.strip.dirty:
+            self.strip.dirty = False
+            self.canvas.delete(ALL)
+            #self.canvas.create_rectangle(1,1, (SIZE+5)*11, (SIZE+5)*11)
+            for i, led in enumerate(self.strip):
+                row = i / 11
+                col = i % 11
+                if row & 1:
+                    col = 10 - col
+                color = "#" + ("{:02x}"*3).format(*led)
+                self.canvas.create_rectangle(col*(SIZE+5)+4, row*(SIZE+5)+4, col*(SIZE+5)+SIZE, row*(SIZE+5)+SIZE, fill=color)
+            self.update_idletasks()
         self.after(DELAY, self.draw_leds)
-        self.update_idletasks()
 
 class FakeStrip(LedStrip):
     def _run(self):
         root = Tk()
+        root.wm_title("Fake Strip")
         app = MyApp(strip=self, master=root)
         app.mainloop()
         sys.exit(0)
@@ -67,6 +70,10 @@ class FakeStrip(LedStrip):
         thread = threading.Thread(target=self._run)
         thread.daemon = True
         thread.start()
+        self.dirty = False
+
+    def update(self):
+        self.dirty = True
 
 if __name__ == "__main__":
     strip = FakeStrip(num_leds=121)
