@@ -38,14 +38,14 @@ class Lpd8806(LedStrip):
 
 
     def _to_bytearray(self, r,g,b):
-        return bytearray(g,r,b)
+        return bytearray([g,r,b])
 
     def update(self):
         """
         Flush the leds to the strand
         """
-        for x in range(self.leds):
-            self.spi.write(self.leds[x])
+        for x in self.leds:
+            self.spi.write(x)
 
         self.spi.write(bytearray(b'\x00'))
         self.spi.flush()
