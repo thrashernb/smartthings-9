@@ -1,6 +1,4 @@
 /**
- *  Copyright 2015 SmartThings
- *
  *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  *  in compliance with the License. You may obtain a copy of the License at:
  *
@@ -22,13 +20,30 @@ metadata {
 		capability "Sensor"
         capability "Polling"
         
-		command "setColor"
-        command "reset"        
+        command "reset"     
         command "refresh"
-        command "setLevel2"
+
+		//Color 1 control
+		command "setLevel1"
+        command "setColor1"
+        command "setAdjustedColor"
+        
+        //Color 2 control
+		command "nextMode"
+		command "setLevel2"
         command "setColor2"
-        command "nextMode"
+
+		//Level 3
+		command "setLevel3"
+
+        //External access for smart apps
+        command "setState"
+        
+        
+        //Other attributes
         attribute "mode", "enum", ["single_color", "dual_color", "rainbow", "changing"]
+        attribute "level2", "number"
+        attribute "level3", "number"
 	}
 
 	simulator {
@@ -44,10 +59,10 @@ metadata {
 				attributeState "turningOff", label:'${name}', action:"switch.on", icon:"st.lighting.light21", backgroundColor:"#ffffff", nextState:"turningOn"
 			}
 			tileAttribute ("device.level", key: "SLIDER_CONTROL") {
-				attributeState "level", action:"switch level.setLevel"
+				attributeState "level", action:"setLevel1"
 			}
 			tileAttribute ("device.color", key: "COLOR_CONTROL") {
-				attributeState "color", action:"setColor"
+				attributeState "color", action:"setAdjustedColor"
 			}
 		}
 
@@ -56,7 +71,7 @@ metadata {
                 attributeState "single_color", label: "Single Color", action: "nextMode", icon:"st.secondary.tools", nextState:"changing"
                 attributeState "dual_color", label: "Dual Color", action: "nextMode", icon:"st.secondary.tools", nextState:"changing"
                 attributeState "rainbow", label: "Rainbow", action: "nextMode", icon:"st.secondary.tools", nextState:"changing"
-                attributeState "changing", label: "Changing Mode"
+                attributeState "changing", label: "Changing Mode", action: "nextMode", nextState: "changing"
 			}
 			tileAttribute ("device.level2", key: "SLIDER_CONTROL") {
 				attributeState "level2", action:"setLevel2"
@@ -65,6 +80,9 @@ metadata {
 				attributeState "color2", action:"setColor2"
 			}
 		}
+        controlTile("level3", "level3", "slider", width:"6", height:1) {
+        	state "default", label:"", action:"setLevel3"
+        }
 
 		standardTile("reset", "device.reset", inactiveLabel: false, decoration: "flat", width: 2, height: 2) {
 			state "default", label:"Reset Color", action:"reset", icon:"st.lights.philips.hue-single"
@@ -72,9 +90,10 @@ metadata {
 		standardTile("refresh", "device.switch", inactiveLabel: false, decoration: "flat", width: 2, height: 2) {
 			state "default", label:"", action:"refresh.refresh", icon:"st.secondary.refresh"
 		}
+        
 	}
 	main(["switch"])
-	details(["switch", "switch2", "refresh", "reset"])
+	details(["switch", "switch2", "level3", "refresh", "reset"])
     
 }
 
@@ -86,24 +105,34 @@ def parse(description) {
     def json = msg.json
     //log.debug "Result: $msg"
     if (msg.status == 200) {
-    	//log.debug "Result: $json"
+    	log.debug "Result: $json"
         //results << createEvent(name: "switch", value: json.enabled)
         json.each {
         	def n = it.getKey()
         	if (n != "status") {
             	def v = it.getValue()
-        		results << createEvent(name: n, value: v)//, displayed:false)
-        		log.debug "Status: $n = $v"
+        		results << createEvent(name: n, value: v) //, displayed:false)
+        		//log.debug "Status: $n = $v"
         	}
         }
     }
 	results
 }
 
+/////////////////////////////////////////////////////////////////////////////////////////////////////
+def setLevel1(percent) { log.debug "setLevel1($percent)"; POST([level: percent]) }
+def setAdjustedColor(value) {
+	def setValues = [:]
+	setValues.color_raw = [hue: value.hue, saturation:value.saturation]
+    setValues.color = value.hex
+	log.debug "setAdjustedColor($value) = $setValues"; 
+    POST(setValues) ;
+}
+/////////////////////////////////////////////////////////////////////////////////////////////////////
 // handle commands
 def nextMode() {
 	log.debug "nextMode()"
-	log.debug("Executing ${uri}, args=${args}")
+	//log.debug("Executing ${uri}, args=${args}")
 	def hubAction = [new physicalgraph.device.HubAction(
 		method: "POST",
 		path: "/next_mode",
@@ -113,44 +142,27 @@ def nextMode() {
 	return hubAction
 }
 
-def on() { POST([switch: "on"]) }
-def off() {	POST([switch: "off"]) }
-
-def setLevel(percent) { POST([level: percent]) }
-def setColor(value) { POST(color_raw: [hue: value.hue, saturation:value.saturation], color: value.hex) }
-
 def setLevel2(percent) { POST(level2: percent)}
-def setColor2(value) { POST(color2_raw: [hue: value.hue, saturation:value.saturation], color2: value.hex) }
+def setColor2(value) { POST(color2_raw: [hue: value.hue, saturation:value.saturation]) }
+def setLevel3(percent) { POST(level3: percent)}
 
 
-def setSaturation(percent) {
-	log.debug "setSaturation($percent)"
-}
 
-def setHue(percent) {
-	log.debug "setHue($percent)"
-}
-
+/////////////////////////////////////////////////////////////////////////////////////////////////////
+// Helper functions
 def reset() {
-	log.debug "Executing 'reset'"
-    def value = [level:100, hex:"#90C638", saturation:56, hue:23]
-    setColor(value)
-    setLevel(100)
+	log.debug "reset()"
+    POST(mode:"single_color", level:100, color_raw:[hue:16.6666668, saturation:27.450981])
 }
 
 def refresh() {
-	log.debug "Executing 'refresh'"
+	log.debug "refresh()"
     GET()
 }
 
-def poll() {
-	refresh()
-}
-
-
 
 private GET() {
-  log.debug("Executing get api to " + getHostAddress())
+  //log.debug("Executing get api to " + getHostAddress())
   def hubAction = new physicalgraph.device.HubAction(
     method: "GET",
 	path: "/status",
@@ -159,7 +171,7 @@ private GET() {
   return hubAction
 }
 private POST(args=[]) {
-	log.debug("Executing ${uri}, args=${args}")
+	//log.debug("POST args=${args}")
 	def hubAction = [new physicalgraph.device.HubAction(
 		method: "POST",
 		path: "/control",
@@ -184,3 +196,59 @@ private getHostAddress() {
 	def port = convertHexToInt(parts[1])
 	return ip + ":" + port
 }
+
+
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////
+// Color control commands
+def setLevel(percent) {
+	log.debug "setLevel(percent)"
+	setLevel1(percent)
+}
+
+def setColor(value) {
+	def setValues = [:]
+    if (value.saturation) { 
+    	setValues.color_raw = [hue: value.hue, saturation:value.saturation]
+        setValues.hue = value.hue
+        setValues.saturation = value.saturation
+    }
+    if (value.switch) {
+    	setValues.switch = value.switch
+     }
+    if (value.level > 0) {
+    	setValues.level = value.level
+     	setValues.switch = "on"
+    }
+    else if (value.level) {
+    	setValues.level = value.level
+     	setValues.switch = "off"
+	}    
+    if (value.hex) {
+    	setValues.color = value.hex
+    }
+    setValues.mode = "single_color"
+    
+
+	log.debug "setColor($value) = $setValues"; 
+    POST(setValues) ;
+}
+def setSaturation(percent) {
+	log.debug "setSaturation($percent)"
+}
+
+def setHue(percent) {
+	log.debug "setHue($percent)"
+}
+/////////////////////////////////////////////////////////////////////////////////////////////////////
+// Switch commands
+def on() { POST([switch: "on"]) }
+def off() {	POST([switch: "off"]) }
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////
+// Poll interface
+def poll() {
+	log.debug "poll()"
+	refresh()
+}
+
