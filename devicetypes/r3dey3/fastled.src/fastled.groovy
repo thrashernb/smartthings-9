@@ -122,10 +122,10 @@ def parse(description) {
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 def setLevel1(percent) { log.debug "setLevel1($percent)"; POST([level: percent]) }
 def setAdjustedColor(value) {
+	log.debug "setAdjustedColor($value) = $setValues"; 
 	def setValues = [:]
 	setValues.color_raw = [hue: value.hue, saturation:value.saturation]
     setValues.color = value.hex
-	log.debug "setAdjustedColor($value) = $setValues"; 
     POST(setValues) ;
 }
 /////////////////////////////////////////////////////////////////////////////////////////////////////
