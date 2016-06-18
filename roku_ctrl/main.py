@@ -2,6 +2,7 @@
 
 from flask import Flask
 from flask import request
+from flask import Response
 from flask_json import FlaskJSON, JsonError, json_response, as_json
 import sys
 import threading
@@ -31,8 +32,17 @@ def control():
     return ret
 
 
+@app.route("/subscribe", methods=["SUBSCRIBE"])
+#@as_json
+def subscribe():
+    print 'headers = %r' %(request.headers)
+    resp = Response()
+    resp.headers['SID'] = 'uuid:roku-0'
+    return resp
+
+
 state = {
-    "switch": "off",
+    #"switch": "off",
 }
 
 import json
@@ -52,9 +62,6 @@ def save():
     with open("state.json", "w") as f:
         json.dump(state, f, indent=4)
 
-def do_update(state):
-    pass
-
 def update(new_data = {}):
     global state
     print "\nState = %r" % (state)
@@ -67,14 +74,13 @@ def update(new_data = {}):
 
 def do_update(new_data):
     global roku_control
-    print new_data
     try:
         if new_data["switch"] == "off":
             roku_control.power()
             state.update(new_data)
     except KeyError:
         pass
-    print 'State = %r, new = %r' % (state, new_data)
+    #print 'State = %r, new = %r' % (state, new_data)
 
 import threading
 class RokuControl(object):
@@ -122,11 +128,11 @@ class RokuControl(object):
                 self.on = info.power_mode == 'PowerOn'
                 if not self.on:
                     delay = 90
-            #print time.time(), self.on, delay
+            print time.time(), self.on, delay
             time.sleep(delay)
 
 def main():
-    update()
+    #update()
     app.run(host="0.0.0.0",port=0xf00d)
     sys.exit(0)
 
