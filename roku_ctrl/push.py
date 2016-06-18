@@ -70,4 +70,4 @@ def push(state):
         'SID':'uuid:roku-0',
         'SEQ':3,
     }
-    session.request('NOTIFY', url, json=state, headers=headers)
+    print session.request('NOTIFY', url, json=state, headers=headers)

@@ -4,6 +4,7 @@ from flask import Flask
 from flask import request
 from flask import Response
 from flask_json import FlaskJSON, JsonError, json_response, as_json
+import uuid
 import sys
 import threading
 import requests
@@ -34,7 +35,7 @@ def control():
 @app.route("/subscribe", methods=["SUBSCRIBE"])
 def subscribe():
     resp = Response()
-    resp.headers['SID'] = 'uuid:roku-0'
+    resp.headers['SID'] = 'uuid:roku-%s' %(uuid.uuid1())
     return resp
 
 
@@ -127,7 +128,7 @@ class RokuControl(object):
                     continue
                 self.on = info.power_mode == 'PowerOn'
                 delay = 15
-            #print time.time(), self.on, delay
+            print time.time(), self.on, delay
             for i in range(delay):
                 if self.update:
                     print "UPDATE"
