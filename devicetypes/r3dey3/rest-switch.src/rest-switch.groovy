@@ -16,7 +16,7 @@ metadata {
 		capability "Switch"
         capability "Polling"
         
-        command "refresh"
+        capability "Refresh"
 
         //External access for smart apps
         command "setState"
@@ -30,10 +30,8 @@ metadata {
 	tiles (scale: 2){
 		multiAttributeTile(name:"switch", type: "lighting", width: 6, height: 4, canChangeIcon: true){
 			tileAttribute ("device.switch", key: "PRIMARY_CONTROL") {
-				attributeState "on", label:'${name}', action:"switch.off", icon:"st.switches.switch.on", nextState:"turningOff"
-				attributeState "off", label:'${name}', action:"switch.on", icon:"st.switches.switch.off", nextState:"turningOn"
-				attributeState "turningOn", label:'${name}', action:"switch.off", icon:"st.switches.switch.on", nextState:"turningOff"
-				attributeState "turningOff", label:'${name}', action:"switch.on", icon:"st.switches.switch.on", nextState:"turningOn"
+				attributeState "on", label:'${name}', action:"switch.off", icon:"st.switches.switch.on", nextState:"off", backgroundColor: "#79b821"
+				attributeState "off", label:'${name}', action:"switch.on", icon:"st.switches.switch.off", nextState:"off", backgroundColor: "#ffffff"
 			}
 		}
 
@@ -111,10 +109,8 @@ private String convertHexToIP(hex) {
 }
 private getHostAddress() {
 	def parts = device.deviceNetworkId.split(":")
-		ip = parts[0]
-		port = parts[1]
-	//def ip = convertHexToIP(parts[0])
-	//def port = convertHexToInt(parts[1])
+	def ip = convertHexToIP(parts[0])
+	def port = convertHexToInt(parts[1])
 	return ip + ":" + port
 }
 
