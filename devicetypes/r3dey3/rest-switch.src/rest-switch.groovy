@@ -18,9 +18,6 @@ metadata {
         
         capability "Refresh"
 
-        //External access for smart apps
-        command "setState"
-        
 	}
 
 	simulator {
@@ -42,28 +39,12 @@ metadata {
 	}
 	main(["switch"])
 	details(["switch", "refresh"])
-    
-    mappings{
-    path("/roku_update") {
-    	action: [
-        GET: "update_get",
-        NOFITY: "update_notify"
-        ]
-        }
-        }
-    
 }
 
-def update_get(p) {
-log.trace "update_get(${p})"
-}
-def update_notify(p) {
-log.trace "update_notify(${p})"
-}
-
-// parse events into attributes
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Response Parsing
 def parse(description) {
-	log.trace "parse() - $description"
+	log.trace "parse($description)"
     
 	def results = []
     def msg = parseLanMessage(description)
@@ -71,13 +52,11 @@ def parse(description) {
     log.trace "MESSAGE Result: $msg"
     if (msg.status == 200 || msg.header.startsWith('NOTIFY')) {
     	log.debug "JSON Result: $json"
-        //results << createEvent(name: "switch", value: json.enabled)
         json.each {
         	def n = it.getKey()
         	if (n != "status") {
             	def v = it.getValue()
-        		results << createEvent(name: n, value: v) //, displayed:false)
-        		//log.debug "Status: $n = $v"
+        		results << createEvent(name: n, value: v)
         	}
         }
     }
@@ -85,29 +64,9 @@ def parse(description) {
 	results
 }
 
-def locationHandler(evt) {
-    def description = evt.description
-    def hub = evt?.hubId
-
-    
-//        log.trace "evt"+evt
-    log.trace "locationHandler(${evt})"
-}
-
-def installed() {
-log.trace "installed()"
-subscribe(location, null, locationHandler, [filterEvents:false])
-}
-/////////////////////////////////////////////////////////////////////////////////////////////////////
-// Helper functions
-def refresh() {
-	log.debug "refresh()"
-    return [subscribe(),GET()]
-}
-
-
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Communication functions
 private GET() {
-  //log.debug("Executing get api to " + getHostAddress())
   def hubAction = new physicalgraph.device.HubAction(
     method: "GET",
 	path: "/status",
@@ -116,18 +75,17 @@ private GET() {
   return hubAction
 }
 private POST(args=[]) {
-	//log.debug("POST args=${args}")
 	def hubAction = [new physicalgraph.device.HubAction(
 		method: "POST",
 		path: "/control",
 		body: args,
 		headers: [Host:getHostAddress() ]
-		)] //, delayAction(100)]
+		), delayAction(100)]
 	return hubAction
 }
 
-private subscribe() {
-    log.trace "subscribe()"
+private SUBSCRIBE() {
+    log.trace "SUBSCRIBE()"
     def address = getCallBackAddress()
     def ip = getHostAddress()
 
@@ -136,16 +94,15 @@ private subscribe() {
         path: '/subscribe',
         headers: [
             HOST: ip,
-            CALLBACK: "<http://${address}/roku_update>",
+            CALLBACK: "<http://${address}/>",
             NT: "upnp:event",
             TIMEOUT: "Second-120"
         ],
     )
 
-    log.trace "SUBSCRIBE $path"
-
     return result
 }
+/////////////////////////////////////////////////////////////////////////////////////////////////////
 //helper methods
 private delayAction(long time) {
 	new physicalgraph.device.HubAction("delay $time")
@@ -158,9 +115,8 @@ private String convertHexToIP(hex) {
 }
 private getHostAddress() {
 	def parts = device.deviceNetworkId.split(":")
-	//def ip = convertHexToIP(parts[0])
-	//def port = convertHexToInt(parts[1])
-    return "192.168.200.215:61453"
+	def ip = convertHexToIP(parts[0])
+	def port = convertHexToInt(parts[1])
 	return ip + ":" + port
     
 }
@@ -168,19 +124,21 @@ private getCallBackAddress() {
 	device.hub.getDataValue("localIP") + ":" + device.hub.getDataValue("localSrvPortTCP")
 }
 
-
-
-/////////////////////////////////////////////////////////////////////////////////////////////////////
-// Color control commands
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 // Switch commands
 def on() { return POST([switch: "on"]) }
 def off() {	return POST([switch: "off"]) }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
+// Refresh interface
+def refresh() {
+	log.trace "refresh()"
+    return [SUBSCRIBE(),GET()]
+}
+/////////////////////////////////////////////////////////////////////////////////////////////////////
 // Poll interface
 def poll() {
-	log.debug "poll()"
-	return refresh()
+	log.trace "poll()"
+	return GET()
 }
 
