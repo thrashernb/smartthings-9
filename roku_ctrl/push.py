@@ -69,7 +69,7 @@ def push(state):
     headers = {
         'NT':'upnp:event',
         'NTS':'upnp:propchange',
-        'SID':'uuid:roku-%s' % (uuid)
+        'SID':'uuid:roku-%s' % (uuid),
         'SEQ':3,
     }
     print session.request('NOTIFY', url, json=state, headers=headers)
