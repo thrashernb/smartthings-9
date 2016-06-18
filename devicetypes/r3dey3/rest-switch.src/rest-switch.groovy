@@ -43,17 +43,34 @@ metadata {
 	main(["switch"])
 	details(["switch", "refresh"])
     
+    mappings{
+    path("/roku_update") {
+    	action: [
+        GET: "update_get",
+        NOFITY: "update_notify"
+        ]
+        }
+        }
+    
+}
+
+def update_get(p) {
+log.trace "update_get(${p})"
+}
+def update_notify(p) {
+log.trace "update_notify(${p})"
 }
 
 // parse events into attributes
 def parse(description) {
-	//log.debug "parse() - $description"
+	log.trace "parse() - $description"
+    
 	def results = []
     def msg = parseLanMessage(description)
     def json = msg.json
-    //log.debug "Result: $msg"
-    if (msg.status == 200) {
-    	log.debug "Result: $json"
+    log.trace "MESSAGE Result: $msg"
+    if (msg.status == 200 || msg.header.startsWith('NOTIFY')) {
+    	log.debug "JSON Result: $json"
         //results << createEvent(name: "switch", value: json.enabled)
         json.each {
         	def n = it.getKey()
@@ -64,17 +81,28 @@ def parse(description) {
         	}
         }
     }
+  
 	results
 }
 
+def locationHandler(evt) {
+    def description = evt.description
+    def hub = evt?.hubId
 
+    
+//        log.trace "evt"+evt
+    log.trace "locationHandler(${evt})"
+}
 
-
+def installed() {
+log.trace "installed()"
+subscribe(location, null, locationHandler, [filterEvents:false])
+}
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 // Helper functions
 def refresh() {
 	log.debug "refresh()"
-    GET()
+    return [subscribe(),GET()]
 }
 
 
@@ -97,6 +125,27 @@ private POST(args=[]) {
 		)] //, delayAction(100)]
 	return hubAction
 }
+
+private subscribe() {
+    log.trace "subscribe()"
+    def address = getCallBackAddress()
+    def ip = getHostAddress()
+
+    def result = new physicalgraph.device.HubAction(
+        method: "SUBSCRIBE",
+        path: '/subscribe',
+        headers: [
+            HOST: ip,
+            CALLBACK: "<http://${address}/roku_update>",
+            NT: "upnp:event",
+            TIMEOUT: "Second-120"
+        ],
+    )
+
+    log.trace "SUBSCRIBE $path"
+
+    return result
+}
 //helper methods
 private delayAction(long time) {
 	new physicalgraph.device.HubAction("delay $time")
@@ -109,9 +158,14 @@ private String convertHexToIP(hex) {
 }
 private getHostAddress() {
 	def parts = device.deviceNetworkId.split(":")
-	def ip = convertHexToIP(parts[0])
-	def port = convertHexToInt(parts[1])
+	//def ip = convertHexToIP(parts[0])
+	//def port = convertHexToInt(parts[1])
+    return "192.168.200.215:61453"
 	return ip + ":" + port
+    
+}
+private getCallBackAddress() {
+	device.hub.getDataValue("localIP") + ":" + device.hub.getDataValue("localSrvPortTCP")
 }
 
 
@@ -120,13 +174,13 @@ private getHostAddress() {
 // Color control commands
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 // Switch commands
-def on() { POST([switch: "on"]) }
-def off() {	POST([switch: "off"]) }
+def on() { return POST([switch: "on"]) }
+def off() {	return POST([switch: "off"]) }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 // Poll interface
 def poll() {
 	log.debug "poll()"
-	refresh()
+	return refresh()
 }
 
