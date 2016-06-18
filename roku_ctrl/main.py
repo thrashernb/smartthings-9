@@ -61,7 +61,6 @@ def save():
 
 def update(new_data = {}):
     global state
-    print "\nState = %r" % (state)
     try:
         if (new_data["switch"] == "on") != roku_control.on:
             roku_control.power()
@@ -108,7 +107,7 @@ class RokuControl(object):
 
     def _monitor(self):
         curState = ""
-        delay = 90
+        delay = 15
         while True:
             if not self.device:
                 devices = Roku.discover(timeout=10)
@@ -127,12 +126,8 @@ class RokuControl(object):
                     delay = 0
                     continue
                 self.on = info.power_mode == 'PowerOn'
-                if self.on:
-                    delay = 15
-                else:
-                    #delay={0:15,15:10,10:20,20:30,30:60,60:90,90:120,120:120}[delay]
-                    delay=30
-            print time.time(), self.on, delay
+                delay = 15
+            #print time.time(), self.on, delay
             for i in range(delay):
                 if self.update:
                     print "UPDATE"
