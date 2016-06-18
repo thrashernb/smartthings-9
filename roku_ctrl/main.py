@@ -100,7 +100,6 @@ class RokuControl(object):
     def on(self, value):
         global state
         state["switch"] = ["off", "on"][value]
-        print "RETRIEVED STATE = %r" %(state)
 
     def _monitor(self):
         curState = ""
