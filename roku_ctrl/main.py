@@ -43,7 +43,6 @@ def load():
             new_state = json.load(f)
         print "Loaded", new_state
         state.update(**new_state)
-        state["switch"] = "on"
     except:
         print "Exception"
         pass
@@ -63,7 +62,6 @@ def update(new_data = {}):
         do_update(new_data)
     except Exception as e:
         print "ERROR: %r" % (e)
-    save()
     return state
 
 
@@ -129,7 +127,6 @@ class RokuControl(object):
             time.sleep(delay)
 
 def main():
-    load()
     update()
     app.run(host="0.0.0.0",port=0xf00d)
     sys.exit(0)
