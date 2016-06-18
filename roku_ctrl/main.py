@@ -8,6 +8,7 @@ import sys
 import threading
 import requests
 import time
+from push import push
 
 from roku import Roku
 
@@ -26,16 +27,12 @@ def get_status():
 def control():
     global state
     data = request.get_json(force=True)
-    update(data)
-    ret = {k:v for k,v in state.iteritems() if not k.startswith("_")}
-    print "Returning %r" % (ret)
+    ret = update(data)
     return ret
 
 
 @app.route("/subscribe", methods=["SUBSCRIBE"])
-#@as_json
 def subscribe():
-    print 'headers = %r' %(request.headers)
     resp = Response()
     resp.headers['SID'] = 'uuid:roku-0'
     return resp
@@ -66,56 +63,59 @@ def update(new_data = {}):
     global state
     print "\nState = %r" % (state)
     try:
-        do_update(new_data)
-    except Exception as e:
-        print "ERROR: %r" % (e)
-    return state
-
-
-def do_update(new_data):
-    global roku_control
-    try:
-        if new_data["switch"] == "off":
+        if (new_data["switch"] == "on") != roku_control.on:
             roku_control.power()
-            state.update(new_data)
     except KeyError:
         pass
-    #print 'State = %r, new = %r' % (state, new_data)
+    except Exception as e:
+        print "ERROR: %r" % (e)
+    return {}
 
-import threading
+
 class RokuControl(object):
     def __init__(self):
         self.device = None
         self.thread = threading.Thread(target=self._monitor)
         self.thread.daemon = True
         self.thread.start()
+        self.update = False
 
 
     def power(self):
         try:
             self.device.power()
+            self.update = True
+            self.on = not self.on
         except AttributeError:
-            pass
+            global state
+            push(state)
     
     @property
     def on(self):
         global state
-        return state["switch"] == "on"
+        try:
+            return state["switch"] == "on"
+        except KeyError:
+            return None
 
     @on.setter
     def on(self, value):
         global state
+        cur = self.on
         state["switch"] = ["off", "on"][value]
+        if value != cur:
+            push(state)
 
     def _monitor(self):
         curState = ""
+        delay = 90
         while True:
-            delay = 30
             if not self.device:
                 devices = Roku.discover(timeout=10)
                 try:
                     self.device = devices[0]
                 except IndexError:
+                    delay = 20
                     self.on = False
 
             if self.device:
@@ -124,15 +124,24 @@ class RokuControl(object):
                 except requests.exceptions.ConnectionError:
                     self.device = None
                     self.on = False
+                    delay = 0
                     continue
                 self.on = info.power_mode == 'PowerOn'
-                if not self.on:
-                    delay = 90
+                if self.on:
+                    delay = 15
+                else:
+                    #delay={0:15,15:10,10:20,20:30,30:60,60:90,90:120,120:120}[delay]
+                    delay=30
             print time.time(), self.on, delay
-            time.sleep(delay)
+            for i in range(delay):
+                if self.update:
+                    print "UPDATE"
+                    self.update = False
+                    break
+                time.sleep(1)
+
 
 def main():
-    #update()
     app.run(host="0.0.0.0",port=0xf00d)
     sys.exit(0)
 

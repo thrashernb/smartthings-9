@@ -4,6 +4,22 @@ import socket
 import requests
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3 import PoolManager, HTTPConnectionPool
+import SocketServer
+
+def server_bind(self):
+    """Called by constructor to bind the socket.
+
+    May be overridden.
+
+    """
+    if self.allow_reuse_address:
+        self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+        self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    self.socket.bind(self.server_address)
+    self.server_address = self.socket.getsockname()
+
+#Monkey patch to enable REUSEPORT
+SocketServer.TCPServer.server_bind = server_bind
 
 try:
     from http.client import HTTPConnection
@@ -14,7 +30,6 @@ class MyAdapter(HTTPAdapter):
     def init_poolmanager(self, connections, maxsize, **kwargs):
         self.poolmanager = MyPoolManager(num_pools=connections,
                                          maxsize=maxsize, **kwargs)
-
 
 class MyPoolManager(PoolManager):
     def _new_pool(self, scheme, host, port):
@@ -33,27 +48,26 @@ class MyHTTPConnectionPool(HTTPConnectionPool):
 
 class MyHTTPConnection(HTTPConnection):
     def connect(self):
-        #global sock
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
         sock.bind(('0.0.0.0', 0xf00d))
         self.sock = sock
-        print self.host, self.port
         sock.connect((self.host, self.port))
         if self._tunnel_host:
             self._tunnel()
-        
 
-url = "http://192.168.200.131:39500/roku_update/"
-import sys
-data = {"switch":sys.argv[1]}
-headers = {
-    'NT':'upnp:event',
-    'NTS':'upnp:propchange',
-    'SID':'uuid:roku-0',
-    'SEQ':3,
-}
-s = requests.Session()
-s.mount('http://', MyAdapter())
-print s.request('NOTIFY', url, json=data, headers=headers)
+#Create this stuff to bind to specific source port
+session = requests.Session()
+session.mount('http://', MyAdapter())
+
+def push(state):
+    url = "http://192.168.200.131:39500/roku_update/"
+    import sys
+    headers = {
+        'NT':'upnp:event',
+        'NTS':'upnp:propchange',
+        'SID':'uuid:roku-0',
+        'SEQ':3,
+    }
+    session.request('NOTIFY', url, json=state, headers=headers)
