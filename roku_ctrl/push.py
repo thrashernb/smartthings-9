@@ -6,6 +6,9 @@ from requests.adapters import HTTPAdapter
 from requests.packages.urllib3 import PoolManager, HTTPConnectionPool
 import SocketServer
 
+import uuid
+uuid = uuid.uuid1()
+
 def server_bind(self):
     """Called by constructor to bind the socket.
 
@@ -60,8 +63,6 @@ class MyHTTPConnection(HTTPConnection):
 #Create this stuff to bind to specific source port
 session = requests.Session()
 session.mount('http://', MyAdapter())
-
-uuid = 1
 
 def push(state):
     url = "http://192.168.200.131:39500/roku_update/"

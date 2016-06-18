@@ -4,7 +4,6 @@ from flask import Flask
 from flask import request
 from flask import Response
 from flask_json import FlaskJSON, JsonError, json_response, as_json
-import uuid
 import sys
 import threading
 import requests
@@ -35,9 +34,7 @@ def control():
 @app.route("/subscribe", methods=["SUBSCRIBE"])
 def subscribe():
     resp = Response()
-    my_uuid = uuid.uuid1()
-    resp.headers['SID'] = 'uuid:roku-%s' %(my_uuid)
-    push.uuid = my_uuid
+    resp.headers['SID'] = 'uuid:roku-%s' %(push.uuid)
     return resp
 
 
