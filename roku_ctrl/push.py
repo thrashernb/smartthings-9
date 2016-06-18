@@ -61,13 +61,15 @@ class MyHTTPConnection(HTTPConnection):
 session = requests.Session()
 session.mount('http://', MyAdapter())
 
+uuid = 1
+
 def push(state):
     url = "http://192.168.200.131:39500/roku_update/"
     import sys
     headers = {
         'NT':'upnp:event',
         'NTS':'upnp:propchange',
-        'SID':'uuid:roku-0',
+        'SID':'uuid:roku-%s' % (uuid)
         'SEQ':3,
     }
     print session.request('NOTIFY', url, json=state, headers=headers)

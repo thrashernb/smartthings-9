@@ -9,7 +9,7 @@ import sys
 import threading
 import requests
 import time
-from push import push
+import push
 
 from roku import Roku
 
@@ -35,7 +35,9 @@ def control():
 @app.route("/subscribe", methods=["SUBSCRIBE"])
 def subscribe():
     resp = Response()
-    resp.headers['SID'] = 'uuid:roku-%s' %(uuid.uuid1())
+    my_uuid = uuid.uuid1()
+    resp.headers['SID'] = 'uuid:roku-%s' %(my_uuid)
+    push.uuid = my_uuid
     return resp
 
 
@@ -88,7 +90,7 @@ class RokuControl(object):
             self.on = not self.on
         except AttributeError:
             global state
-            push(state)
+            push.push(state)
     
     @property
     def on(self):
@@ -104,7 +106,7 @@ class RokuControl(object):
         cur = self.on
         state["switch"] = ["off", "on"][value]
         if value != cur:
-            push(state)
+            push.push(state)
 
     def _monitor(self):
         curState = ""
