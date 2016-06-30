@@ -54,40 +54,14 @@ def parseResponse(resp) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Communication functions
 private GET() {
- log.trace "Calling parent.GET  - ${parent.GET}"
- parent.GET(this, "/status")
-return delayAction(100)
+    log.trace "Calling parent.GET  - ${parent.GET}"
+    parent.GET(this, "/status")
 }
 private POST(args=[]) {
-return delayAction(100)
-	def hubAction = [new physicalgraph.device.HubAction(
-		method: "POST",
-		path: "/control",
-		body: args,
-		headers: [Host:getHostAddress() ]
-		), delayAction(100)]
-      
-	//return hubAction
+	parent.POST(this, '/control', args)
 }
-
 private SUBSCRIBE() {
-return delayAction(100)
-    log.trace "SUBSCRIBE()"
-    def address = getCallBackAddress()
-    def ip = getHostAddress()
-
-    def result = new physicalgraph.device.HubAction(
-        method: "SUBSCRIBE",
-        path: '/subscribe',
-        headers: [
-            HOST: ip,
-            CALLBACK: "<http://${address}/>",
-            NT: "upnp:event",
-            TIMEOUT: "Second-120"
-        ],
-    )
-
-    return result
+	parent.SUBSCRIBE(this, '/subscribe', getCallBackAddress())
 }
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 //helper methods
@@ -105,7 +79,10 @@ def getHostAddress() {
     
 }
 private getCallBackAddress() {
-	device.hub.getDataValue("localIP") + ":" + device.hub.getDataValue("localSrvPortTCP")
+
+	def cb = device.hub.getDataValue("localIP") + ":" + device.hub.getDataValue("localSrvPortTCP")
+    log.debug cb
+    return cb
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -118,6 +95,7 @@ def off() { return POST([switch: "off"]) }
 def refresh() {
 	log.trace "refresh()"
     GET()
+    SUBSCRIBE()
 }
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 // Poll interface
