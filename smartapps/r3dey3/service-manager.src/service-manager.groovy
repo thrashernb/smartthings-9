@@ -145,13 +145,17 @@ def ssdpHandler(evt) {
 	String ssdpUSN = parsedEvent.ssdpUSN.toString()
 	if (devices."${ssdpUSN}") {
 		def d = devices."${ssdpUSN}"
-		if (d.networkAddress != parsedEvent.networkAddress || d.deviceAddress != parsedEvent.deviceAddress) {
+		if (d.mac != parsedEvent.mac || d.networkAddress != parsedEvent.networkAddress || d.deviceAddress != parsedEvent.deviceAddress) {
             def dni = ssdpUSN
 			def child = getChildDevice(dni)
+            d.mac = parsedEvent.mac
 			d.networkAddress = parsedEvent.networkAddress
 			d.deviceAddress = parsedEvent.deviceAddress
 			if (child) {
-				child.sync(parsedEvent.networkAddress, parsedEvent.deviceAddress)
+            	child.updateDataValue("ip", parsedEvent.networkAddress)
+                child.updateDataValue("port", parsedEvent.deviceAddress)
+                child.updateDataValue("mac", parsedEvent.mac)
+				//child.sync(parsedEvent.mac, parsedEvent.networkAddress, parsedEvent.deviceAddress)
 			}
 		}
 	} else {
@@ -165,7 +169,7 @@ void deviceDescriptionHandler(physicalgraph.device.HubResponse hubResponse) {
 	def devices = getDevices()
     def device = devices?.find { it?.key?.contains(body?.usn) }
 	if (device && body) {
-    	device.value << [name: body?.name, model:body?.model, serialNumber:body?.serial, verified: true]
+    	device.value << [name: body?.name, model:body?.model, serialNumber:body?.serial, device_type: body?.device_type, verified: true]
 	}
 }
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -189,7 +193,7 @@ def responseHandler(evt) {
 // Methods for devices to communicate out
 def GET(device, url) {
   def host=getDeviceAddress(device)
-  device.log("GET($device, $url) - $host")
+  //device.log("GET($device, $url) - $host")
   def hubAction = new physicalgraph.device.HubAction([method: "GET",
 	path: url,
     headers: [HOST:host]
@@ -200,7 +204,7 @@ def GET(device, url) {
 
 def POST(device, url, args=[]) {
     def host=getDeviceAddress(device)
-    device.log("POST($device, $url, $args) - $host")
+    //device.log("POST($device, $url, $args) - $host")
     def hubAction = new physicalgraph.device.HubAction(
         method: "POST",
         path: url,
@@ -210,7 +214,7 @@ def POST(device, url, args=[]) {
     sendHubCommand(hubAction)
 }
 def SUBSCRIBE(device, url, callback, args=[]) {
-    device.log("SUBSCRIBE($device, $url, $callback, $args)")
+    //device.log("SUBSCRIBE($device, $url, $callback, $args)")
     def host=getDeviceAddress(device)
 
     def hubAction = new physicalgraph.device.HubAction(
@@ -224,7 +228,6 @@ def SUBSCRIBE(device, url, callback, args=[]) {
         ],
         body: args,
     )
-    device.log "Sending subscribe"
     sendHubCommand(hubAction)
 }
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
