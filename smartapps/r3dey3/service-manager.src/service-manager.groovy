@@ -52,14 +52,11 @@ def deviceDiscovery() {
 
 def installed() {
 	log.debug "Installed with settings: ${settings}"
-    //state.devices = []
 	initialize()
 }
 
 def updated() {
 	log.debug "Updated with settings: ${settings}"
-    def children = getChildDevices()
-	log.debug "$children"
 	unsubscribe()
 	initialize()
 }
@@ -69,18 +66,14 @@ def uninstalled() {
 def initialize() {
 	unsubscribe()
 	unschedule()
-    
 	ssdpSubscribe()
 
 	if (selectedDevices) {
 		addDevices()
 	}
-    try {
-		subscribe(location, null, locationHandler, [filterEvents:false])
-    } catch (all) {
-    	log.trace "Subscription already exist"
- 	}
 
+    subscribe(location, null, responseHandler, [filterEvents:false])
+    
 	runEvery5Minutes("ssdpDiscover")
 }
 
@@ -116,7 +109,6 @@ def getDevices() {
 def addDevices() {
 	def devices = getDevices()
 
-    log.debug "Devices = $devices"
 	selectedDevices.each { dni ->
 		def selectedDevice = devices.find{ it.key == dni }
         selectedDevice = selectedDevice?.value
@@ -125,10 +117,9 @@ def addDevices() {
 			d = getChildDevices()?.find {
 				it.deviceNetworkId == dni
 			}
-            log.debug "$dni - $selectedDevice"
             if (!d) {
-                log.debug "Creating Device with dni: ${dni}"
-                addChildDevice("r3dey3", "Generic REST Device", "${dni}", selectedDevice?.hub, [
+                log.debug "Creating ${selectedDevice.device_type} with dni: ${dni}"
+                addChildDevice("r3dey3", selectedDevice.device_type, "${dni}", selectedDevice?.hub, [
                     "label": selectedDevice?.name ?: "Generic UPnP Device",
                     "data": [
                         "mac": selectedDevice.mac,
@@ -141,7 +132,8 @@ def addDevices() {
         }
 	}
 }
-
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//Device search handling
 def ssdpHandler(evt) {
 	def description = evt.description
 	def hub = evt?.hubId
@@ -153,13 +145,11 @@ def ssdpHandler(evt) {
 	String ssdpUSN = parsedEvent.ssdpUSN.toString()
 	if (devices."${ssdpUSN}") {
 		def d = devices."${ssdpUSN}"
-        log.debug "found existing - $d"
 		if (d.networkAddress != parsedEvent.networkAddress || d.deviceAddress != parsedEvent.deviceAddress) {
             def dni = ssdpUSN
 			def child = getChildDevice(dni)
-            log.debug "Update existing device $dni to $child"
-			//d.networkAddress = parsedEvent.networkAddress
-			//d.deviceAddress = parsedEvent.deviceAddress
+			d.networkAddress = parsedEvent.networkAddress
+			d.deviceAddress = parsedEvent.deviceAddress
 			if (child) {
 				child.sync(parsedEvent.networkAddress, parsedEvent.deviceAddress)
 			}
@@ -170,45 +160,33 @@ def ssdpHandler(evt) {
 }
 
 void deviceDescriptionHandler(physicalgraph.device.HubResponse hubResponse) {
-   log.trace "deviceDescriptionHandler($hubResponse)"
+    log.trace "deviceDescriptionHandler($hubResponse)"
 	def body = hubResponse.json
-	log.trace "deviceDescriptionHandler($body)"
 	def devices = getDevices()
     def device = devices?.find { it?.key?.contains(body?.usn) }
 	if (device && body) {
     	device.value << [name: body?.name, model:body?.model, serialNumber:body?.serial, verified: true]
 	}
-    //log.debug "ddh - ${device.value.networkAddress}:${device.value.deviceAddress}"
 }
-
-private Integer convertHexToInt(hex) {
-	Integer.parseInt(hex,16)
-}
-
-private String convertHexToIP(hex) {
-	[convertHexToInt(hex[0..1]),convertHexToInt(hex[2..3]),convertHexToInt(hex[4..5]),convertHexToInt(hex[6..7])].join(".")
-}
-def getDeviceAddress(device) {
- return convertHexToIP(device.getDataValue("ip")) +":"+convertHexToInt(device.getDataValue("port"))
-}
-
-def locationHandler(evt) {
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Process responses from devices and pass down
+def responseHandler(evt) {
 	def description = evt.description
-    log.trace "Location: $description"
-
 	def hub = evt?.hubId
  	def parsedEvent = parseLanMessage(description)
     parsedEvent << ["hub":hub]
     log.trace "locationHandler($parsedEvent)"
+    log.debug parsedEvent?.headers
 	def d = getChildDevices()?.find {
-		it.getDataValue("ip") == parsedEvent?.ip &&  it.getDataValue("port") == parsedEvent?.port
+		(it.getDataValue("ip") == parsedEvent?.ip && it.getDataValue("port") == parsedEvent?.port) ||
+        (it.getDataValue("mac")  == parsedEvent?.mac && it.deviceNetworkId == parsedEvent?.headers?.sid)
 	}
-    log.debug "Found - $d"
 	if (d) {
-    	sendHubCommand(d.parseResponse(parsedEvent))
+    	d.parseResponse(parsedEvent)
     }
 }
-
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Methods for devices to communicate out
 def GET(device, url) {
   def host=getDeviceAddress(device)
   device.log("GET($device, $url) - $host")
@@ -231,10 +209,8 @@ def POST(device, url, args=[]) {
     )
     sendHubCommand(hubAction)
 }
-
-def SUBSCRIBE(device, url, args=[]) {
-    device.log("SUBSCRIBE($device, $url, $args)")
-    def address = getCallBackAddress()
+def SUBSCRIBE(device, url, callback, args=[]) {
+    device.log("SUBSCRIBE($device, $url, $callback, $args)")
     def host=getDeviceAddress(device)
 
     def hubAction = new physicalgraph.device.HubAction(
@@ -242,12 +218,24 @@ def SUBSCRIBE(device, url, args=[]) {
         path: url,
         headers: [
             HOST: host,
-            CALLBACK: "<http://${address}/>",
+            CALLBACK: "<http://${callback}/>",
             NT: "upnp:event",
             TIMEOUT: "Second-120"
         ],
         body: args,
     )
-
+    device.log "Sending subscribe"
     sendHubCommand(hubAction)
 }
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Helper Functions
+private Integer convertHexToInt(hex) {
+	Integer.parseInt(hex,16)
+}
+private String convertHexToIP(hex) {
+	[convertHexToInt(hex[0..1]),convertHexToInt(hex[2..3]),convertHexToInt(hex[4..5]),convertHexToInt(hex[6..7])].join(".")
+}
+def getDeviceAddress(device) {
+ return convertHexToIP(device.getDataValue("ip")) +":"+convertHexToInt(device.getDataValue("port"))
+}
+
