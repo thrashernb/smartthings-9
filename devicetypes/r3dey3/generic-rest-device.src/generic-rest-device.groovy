@@ -13,11 +13,8 @@
 metadata {
 	definition (name: "Generic REST Device", namespace: "r3dey3", author: "Kenny Keslar") {
         capability "Polling"
-        
         capability "Refresh"
-        command "log", ["string"]
-        command "sync", ["string","string"]
-        command "parseResponse"
+		command "parseResponse"
 	}
 
 	simulator {
@@ -54,32 +51,14 @@ def parseResponse(resp) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Communication functions
 private GET() {
-    log.trace "Calling parent.GET  - ${parent.GET}"
     parent.GET(this, "/status")
 }
 private POST(args=[]) {
 	parent.POST(this, '/control', args)
 }
-private SUBSCRIBE() {
-	parent.SUBSCRIBE(this, '/subscribe', getCallBackAddress())
-}
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 //helper methods
-private delayAction(long time) {
-	new physicalgraph.device.HubAction("delay $time")
-}
-private Integer convertHexToInt(hex) {
-	Integer.parseInt(hex,16)
-}
-private String convertHexToIP(hex) {
-	[convertHexToInt(hex[0..1]),convertHexToInt(hex[2..3]),convertHexToInt(hex[4..5]),convertHexToInt(hex[6..7])].join(".")
-}
-def getHostAddress() {
-    return getDataValue("ip")+":"+getDataValue("port")
-    
-}
 private getCallBackAddress() {
-
 	def cb = device.hub.getDataValue("localIP") + ":" + device.hub.getDataValue("localSrvPortTCP")
     log.debug cb
     return cb
@@ -95,26 +74,10 @@ def off() { return POST([switch: "off"]) }
 def refresh() {
 	log.trace "refresh()"
     GET()
-    SUBSCRIBE()
 }
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 // Poll interface
 def poll() {
 	log.trace "poll()"
-	return GET()
-}
-def log(msg) {
- log.debug "From Parent-> "+ msg
- return null
-}
- 
-def sync(ip, port) {
-	def existingIp = getDataValue("ip")
-	def existingPort = getDataValue("port")
-	if (ip && ip != existingIp) {
-		updateDataValue("ip", ip)
-	}
-	if (port && port != existingPort) {
-		updateDataValue("port", port)
-	}
+	GET()
 }
