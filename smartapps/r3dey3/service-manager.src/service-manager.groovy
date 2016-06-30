@@ -18,18 +18,16 @@ definition(
 		namespace: "r3dey3",
 		author: "r3dey3",
 		description: "Python Service Manager SmartApp",
-		category: "SmartThings Labs",
+		category: "",
 		iconUrl: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience.png",
 		iconX2Url: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience@2x.png",
-		iconX3Url: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience@2x.png")
+		iconX3Url: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience@2x.png",
+        singleInstance: true
+  
+        )
 
 
 preferences {
-	page(name: "searchTargetSelection", title: "Search Target", nextPage: "deviceDiscovery") {
-		section("Search Target") {
-			input "searchTarget", "string", title: "Search Target", defaultValue: "urn:schemas-upnp-org:device:python:1", required: true
-		}
-	}
 	page(name: "deviceDiscovery", title: "Device Setup", content: "deviceDiscovery")
 }
 
@@ -37,18 +35,16 @@ def deviceDiscovery() {
 	def options = [:]
 	def devices = getVerifiedDevices()
 	devices.each {
-		def value = it.value.name ?: "Device ${it.value.ssdpUSN.split(':')[1][-3..-1]}"
-		def key = it.value.mac
-		options["${key}"] = value
+		def value = it.value.name ?: "Device ${it.value.ssdpUSN}"
+		options[it.key] = value
 	}
 
 	ssdpSubscribe()
-
 	ssdpDiscover()
 	verifyDevices()
 
 	return dynamicPage(name: "deviceDiscovery", title: "Discovery Started!", nextPage: "", refreshInterval: 5, install: true, uninstall: true) {
-		section("Please wait while we discover your UPnP Device. Discovery can take five minutes or more, so sit back and relax! Select your device below once discovered.") {
+		section("Please wait while we discover your Devices. Discovery can take five minutes or more, so sit back and relax! Select your device below once discovered.") {
 			input "selectedDevices", "enum", required: false, title: "Select Devices (${options.size() ?: 0} found)", multiple: true, options: options
 		}
 	}
@@ -56,47 +52,44 @@ def deviceDiscovery() {
 
 def installed() {
 	log.debug "Installed with settings: ${settings}"
-
+    //state.devices = []
 	initialize()
 }
 
 def updated() {
 	log.debug "Updated with settings: ${settings}"
-
+    def children = getChildDevices()
+	log.debug "$children"
 	unsubscribe()
 	initialize()
 }
-
+def uninstalled() {
+   state.devices = [:]
+}
 def initialize() {
 	unsubscribe()
 	unschedule()
-
+    
 	ssdpSubscribe()
 
 	if (selectedDevices) {
 		addDevices()
 	}
+    try {
+		subscribe(location, null, locationHandler, [filterEvents:false])
+    } catch (all) {
+    	log.trace "Subscription already exist"
+ 	}
 
 	runEvery5Minutes("ssdpDiscover")
 }
 
 void ssdpDiscover() {
-	sendHubCommand(new physicalgraph.device.HubAction("lan discovery ${searchTarget}", physicalgraph.device.Protocol.LAN))
+	sendHubCommand(new physicalgraph.device.HubAction("lan discovery urn:schemas-upnp-org:device:python:1", physicalgraph.device.Protocol.LAN))
 }
 
 void ssdpSubscribe() {
-	subscribe(location, "ssdpTerm.${searchTarget}", ssdpHandler)
-}
-
-Map verifiedDevices() {
-	def devices = getVerifiedDevices()
-	def map = [:]
-	devices.each {
-		def value = it.value.name ?: "Device ${it.value.ssdpUSN.split(':')[1][-3..-1]}"
-		def key = it.value.mac
-		map["${key}"] = value
-	}
-	map
+	subscribe(location, "ssdpTerm.urn:schemas-upnp-org:device:python:1", ssdpHandler)
 }
 
 void verifyDevices() {
@@ -123,48 +116,50 @@ def getDevices() {
 def addDevices() {
 	def devices = getDevices()
 
+    log.debug "Devices = $devices"
 	selectedDevices.each { dni ->
-		def selectedDevice = devices.find { it.value.mac == dni }
+		def selectedDevice = devices.find{ it.key == dni }
+        selectedDevice = selectedDevice?.value
 		def d
 		if (selectedDevice) {
 			d = getChildDevices()?.find {
-				it.deviceNetworkId == selectedDevice.value.mac
+				it.deviceNetworkId == dni
 			}
-		}
-
-		if (!d) {
-			log.debug "Creating Device with dni: ${selectedDevice.value.mac}"
-			addChildDevice("smartthings", "Generic Device", selectedDevice.value.mac, selectedDevice?.value.hub, [
-				"label": selectedDevice?.value?.name ?: "Generic UPnP Device",
-				"data": [
-					"mac": selectedDevice.value.mac,
-					"ip": selectedDevice.value.networkAddress,
-					"port": selectedDevice.value.deviceAddress
-				]
-			])
-		}
+            log.debug "$dni - $selectedDevice"
+            if (!d) {
+                log.debug "Creating Device with dni: ${dni}"
+                addChildDevice("r3dey3", "Generic REST Device", "${dni}", selectedDevice?.hub, [
+                    "label": selectedDevice?.name ?: "Generic UPnP Device",
+                    "data": [
+                        "mac": selectedDevice.mac,
+                        "ip": selectedDevice.networkAddress,
+                        "port": selectedDevice.deviceAddress,
+                        "ssdpPath": selectedDevice.ssdpPath
+                    ]
+                ])
+            }
+        }
 	}
 }
 
 def ssdpHandler(evt) {
-    log.trace "ssdpHandler($evt)"
 	def description = evt.description
 	def hub = evt?.hubId
 
 	def parsedEvent = parseLanMessage(description)
 	parsedEvent << ["hub":hub]
-
-log.trace "ssdpHandler - $parsedEvent"
+	log.trace "ssdpHandler($parsedEvent)"
 	def devices = getDevices()
 	String ssdpUSN = parsedEvent.ssdpUSN.toString()
-    log.debug "usn = $ssdpUSN"
 	if (devices."${ssdpUSN}") {
-log.debug "$parsedEvent"
 		def d = devices."${ssdpUSN}"
+        log.debug "found existing - $d"
 		if (d.networkAddress != parsedEvent.networkAddress || d.deviceAddress != parsedEvent.deviceAddress) {
-			d.networkAddress = parsedEvent.networkAddress
-			d.deviceAddress = parsedEvent.deviceAddress
-			def child = getChildDevice(parsedEvent.mac)
+            def dni = ssdpUSN
+			def child = getChildDevice(dni)
+            log.debug "Update existing device $dni to $child"
+			//d.networkAddress = parsedEvent.networkAddress
+			//d.deviceAddress = parsedEvent.deviceAddress
 			if (child) {
 				child.sync(parsedEvent.networkAddress, parsedEvent.deviceAddress)
 			}
@@ -179,13 +174,11 @@ void deviceDescriptionHandler(physicalgraph.device.HubResponse hubResponse) {
 	def body = hubResponse.json
 	log.trace "deviceDescriptionHandler($body)"
 	def devices = getDevices()
-    log.debug "DEVICES = $devices"
     def device = devices?.find { it?.key?.contains(body?.usn) }
-	log.debug "PRE $device"
-	if (device) {
+	if (device && body) {
     	device.value << [name: body?.name, model:body?.model, serialNumber:body?.serial, verified: true]
 	}
-  log.debug "POST $device"
+    //log.debug "ddh - ${device.value.networkAddress}:${device.value.deviceAddress}"
 }
 
 private Integer convertHexToInt(hex) {
@@ -194,4 +187,67 @@ private Integer convertHexToInt(hex) {
 
 private String convertHexToIP(hex) {
 	[convertHexToInt(hex[0..1]),convertHexToInt(hex[2..3]),convertHexToInt(hex[4..5]),convertHexToInt(hex[6..7])].join(".")
+}
+def getDeviceAddress(device) {
+ return convertHexToIP(device.getDataValue("ip")) +":"+convertHexToInt(device.getDataValue("port"))
+}
+
+def locationHandler(evt) {
+	def description = evt.description
+    log.trace "Location: $description"
+
+	def hub = evt?.hubId
+ 	def parsedEvent = parseLanMessage(description)
+    parsedEvent << ["hub":hub]
+    log.trace "locationHandler($parsedEvent)"
+	def d = getChildDevices()?.find {
+		it.getDataValue("ip") == parsedEvent?.ip &&  it.getDataValue("port") == parsedEvent?.port
+	}
+    log.debug "Found - $d"
+	if (d) {
+    	sendHubCommand(d.parseResponse(parsedEvent))
+    }
+}
+
+def GET(device, url) {
+  def host=getDeviceAddress(device)
+  device.log("GET($device, $url) - $host")
+  def hubAction = new physicalgraph.device.HubAction([method: "GET",
+	path: url,
+    headers: [HOST:host]
+    ]
+  )
+  sendHubCommand(hubAction)
+}
+
+def POST(device, url, args=[]) {
+    def host=getDeviceAddress(device)
+    device.log("POST($device, $url, $args) - $host")
+    def hubAction = new physicalgraph.device.HubAction(
+        method: "POST",
+        path: url,
+        body: args,
+        headers: [Host:$host ]
+    )
+    sendHubCommand(hubAction)
+}
+
+def SUBSCRIBE(device, url, args=[]) {
+    device.log("SUBSCRIBE($device, $url, $args)")
+    def address = getCallBackAddress()
+    def host=getDeviceAddress(device)
+
+    def hubAction = new physicalgraph.device.HubAction(
+        method: "SUBSCRIBE",
+        path: url,
+        headers: [
+            HOST: host,
+            CALLBACK: "<http://${address}/>",
+            NT: "upnp:event",
+            TIMEOUT: "Second-120"
+        ],
+        body: args,
+    )
+
+    sendHubCommand(hubAction)
 }
