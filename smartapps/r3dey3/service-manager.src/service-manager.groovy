@@ -145,17 +145,18 @@ def ssdpHandler(evt) {
 	String ssdpUSN = parsedEvent.ssdpUSN.toString()
 	if (devices."${ssdpUSN}") {
 		def d = devices."${ssdpUSN}"
-		if (d.mac != parsedEvent.mac || d.networkAddress != parsedEvent.networkAddress || d.deviceAddress != parsedEvent.deviceAddress) {
+		if (d.mac != parsedEvent.mac || d.networkAddress != parsedEvent.networkAddress || 
+        		d.deviceAddress != parsedEvent.deviceAddress || d.ssdpPath != parsedEvent.ssdpPath) {
+	        log.debug "Updating $d to $parsedEvent"
             def dni = ssdpUSN
+            devices."${ssdpUSN}" = parsedEvent
+            devices."${ssdpUSN}".verified = false
 			def child = getChildDevice(dni)
-            d.mac = parsedEvent.mac
-			d.networkAddress = parsedEvent.networkAddress
-			d.deviceAddress = parsedEvent.deviceAddress
 			if (child) {
             	child.updateDataValue("ip", parsedEvent.networkAddress)
                 child.updateDataValue("port", parsedEvent.deviceAddress)
                 child.updateDataValue("mac", parsedEvent.mac)
-				//child.sync(parsedEvent.mac, parsedEvent.networkAddress, parsedEvent.deviceAddress)
+                child.updateDataValue("ssdpPath", parsedEvent.ssdpPath)
 			}
 		}
 	} else {
@@ -166,6 +167,7 @@ def ssdpHandler(evt) {
 void deviceDescriptionHandler(physicalgraph.device.HubResponse hubResponse) {
     log.trace "deviceDescriptionHandler($hubResponse)"
 	def body = hubResponse.json
+    log.trace "deviceDescriptionHandler($body)"
 	def devices = getDevices()
     def device = devices?.find { it?.key?.contains(body?.usn) }
 	if (device && body) {
@@ -209,8 +211,9 @@ def POST(device, url, args=[]) {
         method: "POST",
         path: url,
         body: args,
-        headers: [Host:$host ]
+        headers: [Host:host]
     )
+    device.log(hubAction)
     sendHubCommand(hubAction)
 }
 def SUBSCRIBE(device, url, callback, args=[]) {
@@ -222,7 +225,7 @@ def SUBSCRIBE(device, url, callback, args=[]) {
         path: url,
         headers: [
             HOST: host,
-            CALLBACK: "<http://${callback}/>",
+            CALLBACK: "http://${callback}/",
             NT: "upnp:event",
             TIMEOUT: "Second-120"
         ],
