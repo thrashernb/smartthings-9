@@ -8,6 +8,7 @@ import sys
 import threading
 import requests
 import time
+import json
 
 
 app = Flask(__name__)
@@ -18,7 +19,7 @@ FlaskJSON(app)
 def info():
     return {
         'usn': 'uuid:1',
-        'model': 'test',
+        'model': 'random_model',
         'serial': '1234',
         'name': 'randomName',
         'device_type': 'Generic REST Device',
@@ -52,7 +53,6 @@ state = {
     #"switch": "off",
 }
 
-import json
 def load():
     try:
         print "loading"
@@ -79,74 +79,8 @@ def update(new_data = {}):
         print "ERROR: %r" % (e)
     return {}
 
-
-class RokuControl(object):
-    def __init__(self):
-        self.device = None
-        self.thread = threading.Thread(target=self._monitor)
-        self.thread.daemon = True
-        self.thread.start()
-        self.update = False
-
-
-    def power(self):
-        try:
-            self.device.power()
-            self.update = True
-            self.on = not self.on
-        except AttributeError:
-            global state
-            push.push(state)
-    
-    @property
-    def on(self):
-        global state
-        try:
-            return state["switch"] == "on"
-        except KeyError:
-            return None
-
-    @on.setter
-    def on(self, value):
-        global state
-        cur = self.on
-        state["switch"] = ["off", "on"][value]
-        if value != cur:
-            push.push(state)
-
-    def _monitor(self):
-        curState = ""
-        delay = 15
-        while True:
-            if not self.device:
-                devices = Roku.discover(timeout=10)
-                try:
-                    self.device = devices[0]
-                except IndexError:
-                    delay = 20
-                    self.on = False
-
-            if self.device:
-                try:
-                    info = self.device.device_info
-                except requests.exceptions.ConnectionError:
-                    self.device = None
-                    self.on = False
-                    delay = 0
-                    continue
-                self.on = info.power_mode == 'PowerOn'
-                delay = 15
-            print time.time(), self.on, delay
-            for i in range(delay):
-                if self.update:
-                    print "UPDATE"
-                    self.update = False
-                    break
-                time.sleep(1)
-
-
 def main():
-    app.run(host="0.0.0.0",port=1235)
+    app.run(host="0.0.0.0",port=int(sys.argv[1]))
     sys.exit(0)
 
 if __name__ == "__main__":
