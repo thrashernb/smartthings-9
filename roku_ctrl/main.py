@@ -8,12 +8,35 @@ import sys
 import threading
 import requests
 import time
-import push
 
 from roku import Roku
+UUID = 'uuid:roku_tv'
+
+callback_url = None
+
+def push(state):
+    if not callback_url:
+        return
+    #url = "http://192.168.200.131:39500/roku_update/"
+    headers = {
+        'SID':UUID,
+    }
+    requests.post(callback_url, json=state, headers=headers)
 
 app = Flask(__name__)
 FlaskJSON(app)
+
+@app.route("/info")
+@as_json
+def info():
+    return {
+        'usn': UUID,
+        'model': 'TCL',
+        'serial': 'serial',
+        'name': 'Roku TV',
+        'device_type': 'REST Switch',
+    }
+
 
 @app.route("/status")
 @as_json
@@ -32,10 +55,11 @@ def control():
 
 
 @app.route("/subscribe", methods=["SUBSCRIBE"])
+@as_json
 def subscribe():
-    resp = Response()
-    resp.headers['SID'] = 'uuid:roku-%s' %(push.uuid)
-    return resp
+    global callback_url
+    callback_url = request.headers["CALLBACK"]
+    return {}
 
 
 state = {
@@ -87,7 +111,7 @@ class RokuControl(object):
             self.on = not self.on
         except AttributeError:
             global state
-            push.push(state)
+            push(state)
     
     @property
     def on(self):
@@ -103,7 +127,7 @@ class RokuControl(object):
         cur = self.on
         state["switch"] = ["off", "on"][value]
         if value != cur:
-            push.push(state)
+            push(state)
 
     def _monitor(self):
         curState = ""
@@ -127,7 +151,7 @@ class RokuControl(object):
                     continue
                 self.on = info.power_mode == 'PowerOn'
                 delay = 15
-            print time.time(), self.on, delay
+            #print time.time(), self.on, delay
             for i in range(delay):
                 if self.update:
                     print "UPDATE"
