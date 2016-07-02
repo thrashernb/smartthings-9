@@ -12,15 +12,9 @@ import gobject
 LIB_ID = 'urn:schemas-upnp-org:device'
 MCAST_GRP = '239.255.255.250'
 MCAST_PORT = 1900
-SERVICE_LOCS = {'id1': '127.0.0.1:7766', 'id2': '127.0.0.1:7766'}
 
 SERVICE_LOCS = {'python:1': '192.168.200.215:1234'}
 SERVICE_LOCS = {'python:1': '192.168.200.215:1235'}
-DISCOVERY_MSG = ('M-SEARCH * HTTP/1.1\r\n' +
-                 'ST: %(library)s:%(service)s\r\n' +
-                 'MX: 3\r\n' +
-                 'MAN: "ssdp:discover"\r\n' +
-                 'HOST: 239.255.255.250:1900\r\n\r\n')
 
 LOCATION_MSG = ('HTTP/1.1 200 OK\r\n' +
                 'ST: %(library)s:%(service)s\r\n'
