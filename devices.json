@@ -1,0 +1,6 @@
+{
+	"urn:schemas-upnp-org:device:python:1": {
+		"uuid:roku_tv": "http://192.168.200.215:61453/info",
+		"uuid:1":"http://192.168.200.215:1234/info"
+	}
+}
