@@ -15,8 +15,8 @@ metadata {
 		capability "Actuator"
 		capability "Switch"
         capability "Polling"
-        
         capability "Refresh"
+		command "parseResponse"
 
 	}
 
@@ -63,44 +63,34 @@ def parse(description) {
   
 	results
 }
+def parseResponse(resp) {
+	def json = resp.json
+    log.debug "JSON Result: $json"
+    json.each {
+    	def n = it.key
+        if (n != "status") {
+            def v = it.value
+            sendEvent(name: n, value: v)
+        }
+    }
+}    
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Allow parent to log when we call it
+def log(msg) {
+	//log.debug "From Parent -> $msg"
+}
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Communication functions
 private GET() {
-  def hubAction = new physicalgraph.device.HubAction(
-    method: "GET",
-	path: "/status",
-    headers: [HOST:getHostAddress()]
-  )
-  return hubAction
+    parent.GET(this, "/status")
 }
 private POST(args=[]) {
-	def hubAction = [new physicalgraph.device.HubAction(
-		method: "POST",
-		path: "/control",
-		body: args,
-		headers: [Host:getHostAddress() ]
-		), delayAction(100)]
-	return hubAction
+	log.trace "POST($args)"
+	parent.POST(this, '/control', args)
 }
-
 private SUBSCRIBE() {
-    log.trace "SUBSCRIBE()"
-    def address = getCallBackAddress()
-    def ip = getHostAddress()
-
-    def result = new physicalgraph.device.HubAction(
-        method: "SUBSCRIBE",
-        path: '/subscribe',
-        headers: [
-            HOST: ip,
-            CALLBACK: "<http://${address}/>",
-            NT: "upnp:event",
-            TIMEOUT: "Second-120"
-        ],
-    )
-
-    return result
+	parent.SUBSCRIBE(this, '/subscribe', getCallBackAddress())
 }
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 //helper methods
@@ -112,13 +102,6 @@ private Integer convertHexToInt(hex) {
 }
 private String convertHexToIP(hex) {
 	[convertHexToInt(hex[0..1]),convertHexToInt(hex[2..3]),convertHexToInt(hex[4..5]),convertHexToInt(hex[6..7])].join(".")
-}
-private getHostAddress() {
-	def parts = device.deviceNetworkId.split(":")
-	def ip = convertHexToIP(parts[0])
-	def port = convertHexToInt(parts[1])
-	return ip + ":" + port
-    
 }
 private getCallBackAddress() {
 	device.hub.getDataValue("localIP") + ":" + device.hub.getDataValue("localSrvPortTCP")
@@ -133,12 +116,13 @@ def off() {	return POST([switch: "off"]) }
 // Refresh interface
 def refresh() {
 	log.trace "refresh()"
-    return [SUBSCRIBE(),GET()]
+    SUBSCRIBE()
+    GET()
 }
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 // Poll interface
 def poll() {
 	log.trace "poll()"
-	return GET()
+	GET()
 }
 
