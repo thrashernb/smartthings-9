@@ -149,14 +149,16 @@ def ssdpHandler(evt) {
         		d.deviceAddress != parsedEvent.deviceAddress || d.ssdpPath != parsedEvent.ssdpPath) {
 	        log.debug "Updating $d to $parsedEvent"
             def dni = ssdpUSN
-            devices."${ssdpUSN}" = parsedEvent
-            devices."${ssdpUSN}".verified = false
-			def child = getChildDevice(dni)
-			if (child) {
+            def child = getChildDevice(dni)
+			devices."${ssdpUSN}" = parsedEvent
+            if (child) {
             	child.updateDataValue("ip", parsedEvent.networkAddress)
                 child.updateDataValue("port", parsedEvent.deviceAddress)
                 child.updateDataValue("mac", parsedEvent.mac)
                 child.updateDataValue("ssdpPath", parsedEvent.ssdpPath)
+			}
+            else {
+            	devices."${ssdpUSN}".verified = false
 			}
 		}
 	} else {
