@@ -214,46 +214,6 @@ def genericHandler(evt) {
     } catch (e) {
         log.debug "Trying to save the data for ${evt.name} threw an exception: $e"
     }
-	//atomicState.eventBuffer = eventBuffer
-    /*
-	def eventPost = [
-		uri: "http://${logstash_host}:${logstash_port}/smartthings",
-		headers: [
-			"Content-Type": "application/json",
-		],
-		body: data
-	]    
-    
-    try {
-    	httpPostJson(eventPost) { resp ->
-        	log.debug "$resp"
-	    }
-    } catch ( e ) {
-        log.debug "Trying to post the data for ${evt.name} threw an exception: $e"
-    }
-    */
-    
-    /*
-    try {
-        def hubAction = new physicalgraph.device.HubAction(
-            method: "PUT",
-            path: "/smartthings",
-            body: data,
-            headers: [Host: "${logstash_host}:${logstash_port}"]
-        )
-        log.debug hubAction
-        //sendHubCommand(hubAction)
-    } catch ( e ) {
-        log.debug "Trying to sendhubcmd post the data for ${evt.name} threw an exception: $e"
-    }
-    */
-    //dataValue
-    //floatValue
-    //integerValue
-    //longValue
-    //numberValue
-    //numericValue
-    //xyzValue
     
 }
 
@@ -275,9 +235,6 @@ def sendEvents() {
 					'Content-Type': "application/json"
                 ]
             )
-            def msg = """PUT /smartthings HTTP/1.1\r\nContent-Type: application/json\r\nHost: ${logstash_host}:${logstash_port}:1234\r\n\r\n${data}"""
-            def hubAction2 = new physicalgraph.device.HubAction(msg, physicalgraph.device.Protocol.LAN)//, "0CA8C8F5:04D2")
-            log.debug hubAction
             sendHubCommand(hubAction)
         } catch ( e ) {
             log.debug "Trying to sendhubcmd post the data for ${evt.name} threw an exception: $e"
