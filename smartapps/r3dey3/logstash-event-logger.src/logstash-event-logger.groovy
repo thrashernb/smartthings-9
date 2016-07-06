@@ -29,47 +29,34 @@ definition(
 
 
 preferences {
-    section("Log these presence sensors:") {
-        input "presences", "capability.presenceSensor", multiple: true, required: false
-    }
- 	section("Log these switches:") {
-    	input "switches", "capability.switch", multiple: true, required: false
-    }
- 	section("Log these switch levels:") {
-    	input "levels", "capability.switchLevel", multiple: true, required: false
-    }
-	section("Log these motion sensors:") {
-    	input "motions", "capability.motionSensor", multiple: true, required: false
-    }
-	section("Log these temperature sensors:") {
-    	input "temperatures", "capability.temperatureMeasurement", multiple: true, required: false
-    }
-    section("Log these humidity sensors:") {
-    	input "humidities", "capability.relativeHumidityMeasurement", multiple: true, required: false
-    }
-    section("Log these contact sensors:") {
-    	input "contacts", "capability.contactSensor", multiple: true, required: false
-    }
-    section("Log these alarms:") {
-		input "alarms", "capability.alarm", multiple: true, required: false
-	}
-    section("Log these indicators:") {
-    	input "indicators", "capability.indicator", multiple: true, required: false
-    }
-    section("Log these CO detectors:") {
-    	input "codetectors", "capability.carbonMonoxideDetector", multiple: true, required: false
-    }
-    section("Log these smoke detectors:") {
-    	input "smokedetectors", "capability.smokeDetector", multiple: true, required: false
-    }
-    section("Log these water detectors:") {
-    	input "waterdetectors", "capability.waterSensor", multiple: true, required: false
-    }
-    section("Log these acceleration sensors:") {
-    	input "accelerations", "capability.accelerationSensor", multiple: true, required: false
-    }
-    section("Log these energy meters:") {
-        input "energymeters", "capability.energyMeter", multiple: true, required: false
+	section("Log these Things:") {
+    	input "accelerations", "capability.accelerationSensor", title:"Accelerometers", multiple: true, required: false
+        input "alarms", "capability.alarm", title: "Alarms", multiple: true, required: false
+        input "batteries", "capability.battery", title: "Batteries", multiple: true, required: false
+        input "beacons", "capability.beacon", title: "Beacons", multiple: true, required: false
+        input "codetectors", "capability.carbonMonoxideDetector", title: "Carbon  Monoxide Detectors", multiple: true, required: false
+        input "colors", "capability.colorControl", title: "Color Controllers", multiple: true, required: false
+        input "contacts", "capability.contactSensor", title: "Contact Sensors", multiple: true, required: false
+        input "doorsControllers", "capability.doorControl", title: "Door Controllers", multiple: true, required: false
+        input "energymeters", "capability.energyMeter", title: "Energy Meters", multiple: true, required: false
+        input "indicators", "capability.indicator", title: "Indicators", multiple: true, required: false
+        input "illuminances", "capability.illuminanceMeasurement", title: "Illuminance Meters", multiple: true, required: false
+        input "locks", "capability.lock", title: "Locks", multiple: true, required: false
+        input "motions", "capability.motionSensor", title: "Motion Sensors", multiple: true, required: false
+        input "musicPlayers", "capability.musicPlayer", title: "Music Players", multiple: true, required: false
+        input "powerMeters", "capability.powerMeter", title: "Power Meters", multiple: true, required: false
+        input "presences", "capability.presenceSensor", title: "Presence Sensors", multiple: true, required: false
+        input "humidities", "capability.relativeHumidityMeasurement", title: "Humidity Meters", multiple: true, required: false
+        input "relaySwitches", "capability.relaySwitch", title: "Relay Switches", multiple: true, required: false
+        input "sleepSensors", "capability.sleepSensor", title: "Sleep Sensors", multiple: true, required: false
+        input "smokeDetectors", "capability.smokeDetector", title: "Smoke Detectors", multiple: true, required: false
+        input "peds", "capability.stepSensor", title: "Pedometers", multiple: true, required: false
+        input "switches", "capability.switch", title: "Switches", multiple: true, required: false
+        input "levels", "capability.switchLevel", title: "Switch Levels", multiple: true, required: false
+        input "temperatures", "capability.temperatureMeasurement", title: "Temperature Sensors", multiple: true, required: false
+        input "thermostats", "capability.thermostat", title: "Thermostats", multiple: true, required: false
+        input "valves", "capability.valve", title: "Valves", multiple: true, required: false
+        input "waterdetectors", "capability.waterSensor", title: "Water Sensors", multiple: true, required: false
     }
 
     section ("Logstash Server") {
@@ -101,36 +88,100 @@ def initialize() {
 }
 
 def doSubscriptions() {
-	if (alarms)
-		subscribe(alarms,			"alarm",					genericHandler)
-    if (codetectors)
-    	subscribe(codetectors,		"carbonMonoxideDetector",	genericHandler)
-    if (contacts)
-		subscribe(contacts,			"contact",      			genericHandler)
-    if (indicators)
-    	subscribe(indicators,		"indicator",    			genericHandler)
-    if (modes)
-    	subscribe(modes,			"locationMode", 			genericHandler)
-    if (motions)
-    	subscribe(motions,			"motion",       			genericHandler)
-    if (presences)
-   		subscribe(presences,		"presence",     			genericHandler)
-    if (relays)
-    	subscribe(relays,			"relaySwitch",  			genericHandler)
-    if (smokedectors)
-		subscribe(smokedetectors,	"smokeDetector",			genericHandler)
-    if (switches)
-		subscribe(switches,			"switch",       			genericHandler)
-    if (levels)
-    	subscribe(levels,			"level",					genericHandler)
-    if (temperatures)
-		subscribe(temperatures,		"temperature",  			genericHandler)
-    if (waterdetectors)
-		subscribe(waterdetectors,	"water",					genericHandler)
-    if (accelerations)
-    	subscribe(accelerations,    "acceleration",             genericHandler)
-    if (energymeters)
-    	subscribe(energymeters,     "power",                    genericHandler)
+	if (accelerometers != null) {
+		subscribe(accelerometers, "acceleration", genericHandler)
+	}
+	if (alarms != null) {
+		subscribe(alarms, "alarm", genericHandler)
+	}
+	if (batteries != null) {
+		subscribe(batteries, "battery", genericHandler)
+	}
+	if (beacons != null) {
+		subscribe(beacons, "presence", genericHandler)
+	}
+
+	if (codetectors != null) {
+		subscribe(codetectors, "carbonMonoxide", genericHandler)
+	}
+	if (colors != null) {
+		subscribe(colors, "hue", genericHandler)
+		subscribe(colors, "saturation", genericHandler)
+		subscribe(colors, "color", genericHandler)
+	}
+	if (contacts != null) {
+		subscribe(contacts, "contact", genericHandler)
+	}
+	if (energymeters != null) {
+		subscribe(energymeters, "energy", genericHandler)
+	}
+	if (indicators != null) {
+		subscribe(indicators, "indicator", genericHandler)
+	}
+	if (illuminances != null) {
+		subscribe(illuminances, "illuminance", genericHandler)
+	}
+	if (locks != null) {
+		subscribe(locks, "lock", genericHandler)
+	}
+	if (motions != null) {
+		subscribe(motions, "motion", genericHandler)
+	}
+	if (musicPlayers != null) {
+		subscribe(musicPlayers, "status", genericHandler)
+		subscribe(musicPlayers, "level", genericHandler)
+		subscribe(musicPlayers, "trackDescription", genericHandler)
+		subscribe(musicPlayers, "trackData", genericHandler)
+		subscribe(musicPlayers, "mute", genericHandler)
+	}
+	if (powerMeters != null) {
+		subscribe(powerMeters, "power", genericHandler)
+	}
+	if (presences != null) {
+		subscribe(presences, "presence", genericHandler)
+	}
+	if (humidities != null) {
+		subscribe(humidities, "humidity", genericHandler)
+	}
+	if (relaySwitches != null) {
+		subscribe(relaySwitches, "switch", genericHandler)
+	}
+	if (sleepSensors != null) {
+		subscribe(sleepSensors, "sleeping", genericHandler)
+	}
+	if (smokeDetectors != null) {
+		subscribe(smokeDetectors, "smoke", genericHandler)
+	}
+	if (peds != null) {
+		subscribe(peds, "steps", genericHandler)
+		subscribe(peds, "goal", genericHandler)
+	}
+	if (switches != null) {
+		subscribe(switches, "switch", genericHandler)
+	}
+	if (levels != null) {
+		subscribe(levels, "level", genericHandler)
+	}
+	if (temperatures != null) {
+		subscribe(temperatures, "temperature", genericHandler)
+	}
+	if (thermostats != null) {
+		subscribe(thermostats, "temperature", genericHandler)
+		subscribe(thermostats, "heatingSetpoint", genericHandler)
+		subscribe(thermostats, "coolingSetpoint", genericHandler)
+		subscribe(thermostats, "thermostatSetpoint", genericHandler)
+		subscribe(thermostats, "thermostatMode", genericHandler)
+		subscribe(thermostats, "thermostatFanMode", genericHandler)
+		subscribe(thermostats, "thermostatOperatingState", genericHandler)
+	}
+	if (valves != null) {
+		subscribe(valves, "contact", genericHandler)
+	}
+	if (waterdetectors != null) {
+		subscribe(waterdetectors, "water", genericHandler)
+	}
+    
+    
     subscribe(location,			"location",					genericHandler)
     subscribe(location,			"mode",					genericHandler)
     subscribe(location,			"sunset",					genericHandler)
@@ -141,26 +192,45 @@ def genericHandler(evt) {
     //def data = [:]
     def data = new HashMap() 
     
+    try {
+        if (evt.value == null) {
+            return;
+        }
+    } catch (e) {
+    	return
+    }
+    
+    
    	try {
         data.isDigital = evt.isDigital()
         data.isPhysical = evt.isPhysical()
         data.isStateChange = evt.isStateChange()
         data.id = "${evt.id}"
-        data.epoch = now() / 1000.0
-        //if (evt.data) data.extra_data = evt.data
+        data.epoch = now()
+        data.device = ""
+        data.value = "${evt.value}"
+        
+        data.extra_data = "${evt.data}"
         //if (evt.description) data.description = evt.description
-        if (evt.descriptionText) data.descriptionText = evt.descriptionText
+        data.descriptionText = evt.descriptionText
         //if (evt.device) data.device = evt.device
-        if (evt.displayName) data.displayName = evt.displayName
-        if (evt.deviceId) data.deviceId = "${evt.deviceId}"
-        //if (evt.hubId) data.hubId = evt.hubId
+        data.displayName = evt.displayName
+        data.deviceId = "${evt.deviceId}"
+        data.hubId = "${evt.hubId}"
         //if (evt.installedSmartAppId) data.installedSmartAppId = evt.installedSmartAppId
-        if (evt.isoDate) data.isoDate = "${evt.isoDate}"
-        //if (evt.locationId) data.locationId = evt.locationId
-        //if (evt.name) data.name = evt.name
-        if (evt.source) data.source = "${evt.source}"
-        if (evt.value) data.value = "${evt.value}"
-        //if (evt.unit) data.unit = evt.unit
+        data.isoDate = "${evt.isoDate}"
+        data.locationId = "${evt.locationId}"
+        data.name = evt.name
+        data.source = "${evt.source}"
+        if (evt.unit != null) {
+        	data.unit = evt.unit
+        }
+        if (data.unit != null)  {
+        	data.device = "${data.displayName} (${data.name}.${data.unit})"
+        } else {
+        	data.device = "${data.displayName} (${data.name})"
+        }
+        
         
         if (location.id == evt.locationId) {
             data.locationName = "${location.name}"
@@ -175,13 +245,16 @@ def genericHandler(evt) {
         log.debug "Trying to get the data for ${evt.name} threw an exception: $e"
     }
     try {
-    	data.integerValue = evt.integerValue
+        if (evt.integerValue != null) 
+    		data.integerValue = evt.integerValue
     } catch (e) {}
     try {
-    	data.floatValue = evt.floatValue
+        if (evt.floatValue != null) 
+	    	data.floatValue = evt.floatValue
     } catch (e) {}
     try {
-    	data.xyzValue = evt.xyzValue
+        if (evt.xyzValue != null) 
+	    	data.xyzValue = evt.xyzValue
     } catch (e) {}
     
     switch (data.value) {
@@ -196,21 +269,12 @@ def genericHandler(evt) {
         	data.integerValue = 0
         break
     }
-    
-   	if (data.value == 'on') {
-        levels.each { dev ->
-            if (dev.id == data.deviceId) {
-                data.integerValue = dev.currentValue('level')
-            }
-        }
-    }
    	log.trace "genericHandler(${data})"
     
     try {
     	def eventBuffer = atomicState.eventBuffer ?: []
         eventBuffer << data
     	atomicState.eventBuffer = eventBuffer
-        //log.debug "sttate buffer = ${atomicState.eventBuffer}"
     } catch (e) {
         log.debug "Trying to save the data for ${evt.name} threw an exception: $e"
     }
@@ -221,8 +285,8 @@ def genericHandler(evt) {
 def sendEvents() {
 	def eventBuffer = atomicState.eventBuffer ?: []
 	if (eventBuffer.size() >= 1) {
-		// Clear eventBuffer right away since we've already pulled it off of atomicState to reduce the risk of missing
-		// events.
+		// Clear eventBuffer right away to reduce the risk of missing events
+        // since we've already pulled it off of atomicState 
 		atomicState.eventBuffer = []
         try {
         	def data = new groovy.json.JsonOutput().toJson(eventBuffer)
