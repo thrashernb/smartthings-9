@@ -244,6 +244,7 @@ def genericHandler(evt) {
 	} catch (e) {
         log.debug "Trying to get the data for ${evt.name} threw an exception: $e"
     }
+    
     try {
         if (evt.integerValue != null) 
     		data.integerValue = evt.integerValue
@@ -267,9 +268,31 @@ def genericHandler(evt) {
         case 'closed':
         case 'inactive':
         	data.integerValue = 0
-        break
+        	break
     }
    	log.trace "genericHandler(${data})"
+    
+    
+    if (data.name == 'thermostatOperatingState') {
+        thermostats.each { dev ->
+            if (dev.id == data.deviceId) {
+                switch (data.value) {
+                    case 'cooling':
+                    	data.integerValue = dev.getCurrentValue("coolingSetPoint")
+                    	break
+                    case 'heating':
+                    	data.integerValue = dev.getCurrentValue("heatingSetPoint")
+                    	break
+                    case 'idle':
+                    	data.integerValue = 0
+                    	break
+                    default:
+                        data.integerValue = -1
+                    	break
+                }
+            }
+        }
+    }
     
     try {
     	def eventBuffer = atomicState.eventBuffer ?: []
