@@ -16,7 +16,7 @@
 metadata {
 	definition (name: "Child Switch", namespace: "r3dey3", author: "Kenny Keslar") {
 		capability "Switch"
-//        capability "Refresh"
+        capability "Refresh"
         
 	}
 
@@ -31,14 +31,13 @@ metadata {
 				attributeState "off", label:'${name}', action:"switch.on", icon:"st.switches.switch.off", nextState:"on", backgroundColor: "#ffffff"
 			}
 		}
-/*
+
 		standardTile("refresh", "device.switch", inactiveLabel: false, decoration: "flat", width: 2, height: 2) {
 			state "default", label:"", action:"refresh.refresh", icon:"st.secondary.refresh"
-		}*/
+		}
 	}
 	main(["switch"])
-    details(["switch"])
-	//details(["switch", "refresh"])
+    details(["switch", "refresh"])
 }
 
 // parse events into attributes
@@ -48,11 +47,16 @@ def parse(String description) {
 
 // handle commands
 def on() {
-	log.debug "Executing 'on'"
+	log.debug "Executing ${device.name} 'on'"
     parent.on(device)
 }
 
 def off() {
-	log.debug "Executing 'off'"
+	log.debug "Executing ${device.name} 'off'"
     parent.off(device)
+}
+
+def refresh() {
+	log.debug "Executing ${device.name} 'refresh'"
+	parent.refresh()
 }
