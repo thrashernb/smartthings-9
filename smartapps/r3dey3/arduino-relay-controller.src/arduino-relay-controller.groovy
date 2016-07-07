@@ -29,9 +29,9 @@ def controllerSetup() {
 
 def relaySetup() {
    	dynamicPage(name: "relaySetup", title: "Relay Setup", install:true) {
-    	for (int i=1;i<=settings.relayCount;i++) {
-        	section("Relay " + i) {
-                input "relay" + i, title: "Name", "string", description:"Relay " + i, required: false
+    	for (int i=0;i<settings.relayCount;i++) {
+        	section("Relay " + (i+1)) {
+                input "relay" + i, title: "Name", "string", description:"Relay " + (i+1), required: false
 //                input "typezone" + i, "enum", title: "Type", options:["Open/Closed Sensor","Motion Detector"], required: false
             }
         }
@@ -39,6 +39,8 @@ def relaySetup() {
 }
 
 def installed() {
+    atomicState.relayState = ["0","0","0","0","0","0","0","0"]
+    
 	log.debug "Installed with settings: ${settings}"
 	initialize()
 }
@@ -54,23 +56,22 @@ def initialize() {
     // Listen to anything which happens on the device
     subscribe(arduino, "response", statusUpdate)
     
-    for (int i=1;i<=settings.relayCount;i++) {
+    for (int i=0;i<settings.relayCount;i++) {
     	
     	def dni = "${app.id}:relay${i}"
-        def name = "relay$i"
 		def value = settings[name]
 
-        log.debug "checking device: ${name}, value: $value"
+        log.debug "checking device: ${dni}, value: $value"
 
         def existingDevice = getChildDevice(dni)
-        if(!existingDevice) {
-            log.debug "creating device: ${name}"
+        if (!existingDevice) {
+            log.debug "creating device: ${dni}"
             def childDevice = addChildDevice("r3dey3", "Child Switch", dni, null, [
-            	name: "Device.${name}", 
+            	name: "Relay ${i+1}", 
                 label: value, 
                 completedSetup: true,
                 "data": [
-					"name": name,                	
+					"idx": i
                 ]
                 ])
         }
@@ -79,7 +80,9 @@ def initialize() {
             //existingDevice.type = zoneType
             existingDevice.label = value
             existingDevice.take()
-            log.debug "device already exists: ${name}"
+            existingDevice.updateDataValue("idx", "$i")
+            //existingDevice.updateDataValue("Asdasd", "asdasd")
+            log.debug "device already exists: ${existingDevice}"
         }
     }
     
@@ -90,89 +93,61 @@ def initialize() {
         log.debug "deleting child device: ${it.deviceNetworkId}"
         deleteChildDevice(it.deviceNetworkId)
     }
+    refresh()
 }
 
 def uninstalled() {
     //removeChildDevices(getChildDevices())
 }
 def on(child) {
-	arduino.send("GOODBYE");
+	def idx = child.getDataValue('idx')
+    def relayState = atomicState.relayState
+    relayState[idx.toInteger()] = "1"
+    atomicState.relayState = relayState
+    arduino.send("R${idx}1Q")
+    //sendCommand();
 }
 def off(child) {
-	arduino.send("HELLO");
+	def idx = child.getDataValue('idx')
+    def relayState = atomicState.relayState
+    relayState[idx.toInteger()] = "0"
+    atomicState.relayState = relayState
+    arduino.send("R${idx}0Q")
 }
+
+def refresh() {
+	arduino.send("Q")
+}
+
 def statusUpdate(evt)
 {
-	log.debug "${evt}"
-    log.debug "statusUpdate ${evt.value}"
+	log.debug "${evt.description}"
+    log.debug "statusUpdate ${evt.value} "
 	
-
+    def val = evt.value
+	def idx = 0
     
-/*
+    if (evt.value == null) return
+    def relayState = atomicState.relayState
     
-    def parts = evt.value.split();
-        
-    def zonetype = parts[0]
-
-
-    if (zonetype=="heartbeat") {
-    	
-       	state.lastHeartbeat = now()
-        log.debug "received heartbeat: ${state.lastHeartbeat}"
-        
-    }
-    else {
-    
-        
-        def zone = parts[1]
-        def status = parts[2]
-
-        def deviceName = "zone$zone"
-        def typeSettingName = "typezone$zone"
-
-        if (zonetype=="wireless") 
-        {
-            deviceName = "wirelesszone$zone"
-            typeSettingName = "wirelesszonetype$zone"
-        }
-
-        log.debug "$zonetype zone $zone status=$status"
-
-        def device = getChildDevice(deviceName)
-
-        if (device)
-        {
-            log.debug "$device statusChanged $status"
-
-            def zoneType = settings[typeSettingName];
-
-            if (zoneType == null || zoneType == "")
-            {
-                zoneType = "Open/Closed Sensor"
+    while (idx < evt.value.length()) {
+    	if (val[idx] == 'R') {
+        	8.times { i ->
+            	idx++;
+            	def child = getChildDevice("${app.id}:relay${i}")
+                def curVal = val[idx].toInteger()
+                if (curVal != relayState[i] && child) {
+	                def strVal = curVal?"on":"off"
+                    relayState[i] = curVal
+                	log.debug "Sending $child ${strVal}"
+                	child.sendEvent(name:"switch", value: strVal)
+                }
             }
-
-            def eventName = "contact"
-
-            if (zonetype=="wireless") 
-            {
-                status = status=="0" ? "open" : "closed"
-
-            }
-
-            if (zoneType=="Motion Detector")
-            {
-                eventName = "motion";
-                status = status=="open" ? "active" : "inactive"
-            }   
-
-            device.sendEvent(name: eventName, value: status, isStateChange:true)
         }
         else {
-
-            log.debug "couldn't find device for zone ${zone}"
-
+        	break;
         }
-        
+        idx++
     }
-*/
+    atomicState.relayState = relayState
 }
