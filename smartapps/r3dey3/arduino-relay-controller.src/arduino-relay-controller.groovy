@@ -106,7 +106,7 @@ def on(child) {
     relayState[idx.toInteger()] = "1"
     atomicState.relayState = relayState
     arduino.send("R${idx}1Q")
-    //sendCommand();
+    runIn(20, refresh);
 }
 def off(child) {
 	def idx = child.getDataValue('idx')
@@ -114,6 +114,7 @@ def off(child) {
     relayState[idx.toInteger()] = "0"
     atomicState.relayState = relayState
     arduino.send("R${idx}0Q")
+    runIn(20, refresh);
 }
 
 def refresh() {
@@ -137,7 +138,7 @@ def statusUpdate(evt)
             	idx++;
             	def child = getChildDevice("${app.id}:relay${i}")
                 def curVal = val[idx].toInteger()
-                if (curVal != relayState[i] && child) {
+                if (child) {
 	                def strVal = curVal?"on":"off"
                     relayState[i] = curVal
                 	log.debug "Sending $child ${strVal}"
