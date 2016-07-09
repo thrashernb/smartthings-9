@@ -59,7 +59,7 @@ def initialize() {
     for (int i=0;i<settings.relayCount;i++) {
     	
     	def dni = "${app.id}:relay${i}"
-		def value = settings[name]
+		def value = settings["relay${i}"]
 
         log.debug "checking device: ${dni}, value: $value"
 
@@ -67,7 +67,7 @@ def initialize() {
         if (!existingDevice) {
             log.debug "creating device: ${dni}"
             def childDevice = addChildDevice("r3dey3", "Child Switch", dni, null, [
-            	name: "Relay ${i+1}", 
+            	name: value, 
                 label: value, 
                 completedSetup: true,
                 "data": [
@@ -79,6 +79,7 @@ def initialize() {
             //log.debug existingDevice.deviceType
             //existingDevice.type = zoneType
             existingDevice.label = value
+            //existingDevice.name = value
             existingDevice.take()
             existingDevice.updateDataValue("idx", "$i")
             //existingDevice.updateDataValue("Asdasd", "asdasd")
