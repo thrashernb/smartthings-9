@@ -105,34 +105,58 @@ metadata {
         capability "Configuration"
         capability "Relative Humidity Measurement"
         capability "Illuminance Measurement"
-        
-        attribute "sensorlevels", "string"
-        
-        fingerprint deviceId: "0x0701", inClusters: "0x5E,0x98,0x72,0x5A,0x85,0x59,0x73,0x80,0x71,0x31,0x70,0x84,0x7A"
+
+		fingerprint deviceId: "0x0701", inClusters: "0x5E,0x98,0x72,0x5A,0x85,0x59,0x73,0x80,0x71,0x31,0x70,0x84,0x7A"
     }
 
+
     tiles(scale:2) {
-        multiAttributeTile(name:"motion", type: "generic", width: 6, height: 4){
-            tileAttribute ("device.motion", key: "PRIMARY_CONTROL") {
-                attributeState "active", label:'motion', icon:"st.motion.motion.active", backgroundColor:"#53a7c0" 
-                attributeState "inactive", label:'no motion', icon:"st.motion.motion.inactive", backgroundColor:"#ffffff" 
+
+		multiAttributeTile(name:"main", type:"generic", width:6, height:4) {
+			tileAttribute("device.temperature", key: "PRIMARY_CONTROL") {
+            	attributeState "temperature",label:'${currentValue}°', precision:2, backgroundColors:[
+                	[value: 32, color: "#153591"],
+                    [value: 44, color: "#1e9cbb"],
+                    [value: 59, color: "#90d2a7"],
+					[value: 74, color: "#44b621"],
+					[value: 84, color: "#f1d801"],
+					[value: 92, color: "#d04e00"],
+					[value: 98, color: "#bc2323"]
+				]
             }
-            tileAttribute ("device.sensorlevels", key: "SECONDARY_CONTROL") {
-                attributeState "sensorlevels", label: '${currentValue}'
+            tileAttribute("device.humidity", key: "SECONDARY_CONTROL") {
+                attributeState "humidity",label:'RH ${currentValue} %', precision:2
             }
-        }
+		}
+        standardTile("motion","device.motion", width: 2, height: 2) {
+            	state "active",label:'motion',icon:"st.motion.motion.active",backgroundColor:"#53a7c0"
+                state "inactive",label:'no motion',icon:"st.motion.motion.inactive",backgroundColor:"#ffffff"
+			}
+		valueTile("humidity","device.humidity", width: 2, height: 2) {
+           	state "humidity",label:'RH ${currentValue}%', precision:2
+			}
+		valueTile("illuminance","device.illuminance", width: 2, height: 2) {
+            	state "illuminance",label:'LIGHT ${currentValue}%', precision:2
+			}
+		standardTile("acceleration", "device.acceleration", width: 2, height: 2) {
+			state("active", label:'tamper', icon:"", backgroundColor:"#ff0000")
+			state("inactive", label:'clear', icon:"", backgroundColor:"#00ff00")
+		}
+		valueTile("battery", "device.battery", decoration: "flat", width: 2, height: 2) {
+			state "battery", label:'${currentValue}% battery', unit:""
+		}
+		standardTile("refresh", "device.switch", inactiveLabel: false, decoration: "flat", width: 2, height: 2) {
+			state "default", label:"", action:"refresh.refresh", icon:"st.secondary.refresh"
+		}
+
         standardTile("tamper", "device.tamper", decoration: "flat", width: 2, height: 2)
         {
-            state("clear", label:'Secure', defaultState: true, icon:"", backgroundColor: "#ffffff"  )
-            state("detected", label:'Tamper', icon:"st.alarm.alarm.alarm", backgroundColor: "#ffffff" )
-        }
-        valueTile("battery", "device.battery", decoration: "flat", width: 2, height: 2) 
-        {
-            state("battery", label:'${currentValue}% battery')
+            state("clear", label:'Secure', defaultState: true, icon:"st.motion.acceleration.inactive", backgroundColor: "#ffffff"  )
+            state("detected", label:'Tamper', icon:"st.motion.acceleration.active", backgroundColor: "#ffffff" )
         }
 
-        main "motion"
-        details(["motion", "tamper", "battery"])
+        main "main"
+        details(["main", "motion", "humidity", "illuminance", "tamper", "battery", "refresh"])
     }
     
     preferences {
@@ -201,6 +225,16 @@ def parse(String description) {
     return result
 }
 
+def zwaveEvent(physicalgraph.zwave.commands.sensorbinaryv2.SensorBinaryReport cmd) {
+	log.debug "---SENSOR BINARY REPORT V2--- ${device.displayName} sent value: ${cmd.sensorValue}"
+	//motionEvent(cmd.sensorValue)
+}
+
+def zwaveEvent(physicalgraph.zwave.commands.basicv1.BasicSet cmd) {
+	log.debug "---BASIC SET REPORT V1--- ${device.displayName} sent value: ${cmd.value}"
+	//motionEvent(cmd.value)
+}
+
 def zwaveEvent(physicalgraph.zwave.commands.notificationv3.NotificationReport cmd) {
     log.debug "NotificationReport ${cmd}"
     // zooz reports 2 "burgler" event types, motion (8) and tamper (3)
@@ -225,18 +259,18 @@ def zwaveEvent(physicalgraph.zwave.commands.notificationv3.NotificationReport cm
 }
 
 def zwaveEvent(physicalgraph.zwave.commands.sensormultilevelv5.SensorMultilevelReport cmd) {
-    log.debug "SensorMultilevelReport ${cmd}"
+    log.trace "SensorMultilevelReport ${cmd}"
     def evt = []
     switch (cmd.sensorType) {
         case 1: //temp
             if (cmd.scale == 0) {
                 // Celcius, convert to Fahrenheit
                 def temp = ((cmd.scaledSensorValue * 9) / 5) + 32
-                state.temp = Math.round(temp * 100)/100
+                state.temp = Math.round(temp * 10)/10
             } else {
                 state.temp = cmd.scaledSensorValue
             }
-            evt += createEvent([name: "temperature", value: state.temp, unit: "fahrenheit"]) 
+	        evt += createEvent([name: "temperature", value: state.temp, unit: "fahrenheit"]) 
             break
         case 3: // light
             state.illuminance = cmd.scaledSensorValue 
@@ -247,7 +281,7 @@ def zwaveEvent(physicalgraph.zwave.commands.sensormultilevelv5.SensorMultilevelR
             evt += createEvent([name: "humidity", value: state.humidity]) 
             break
     }
-    evt += createEvent([name: "sensorlevels", value: "Temp:${state.temp}°F   Humidity:${state.humidity}%   Light:${state.illuminance}"])
+    //evt += createEvent([name: "sensorlevels", value: "Temp:${state.temp}°F   Humidity:${state.humidity}%   Light:${state.illuminance}"])
 }
 
 def zwaveEvent(physicalgraph.zwave.commands.securityv1.SecurityMessageEncapsulation cmd) {
@@ -255,15 +289,28 @@ def zwaveEvent(physicalgraph.zwave.commands.securityv1.SecurityMessageEncapsulat
                                            0x98:1, 0x5a:1, 0x59:1, 0x73:1, 0x71:3, 0x31:5, 0x7a:1 ])
     if (secCmd) {
     	state.sec = 1
-        return zwaveEvent(secCmd)
+        def ret = zwaveEvent(secCmd)
+        if (ret) return ret;
+        log.debug "Unhandled command: ${secCmd}"
     } else {
         log.debug "SecurityMessageEncapsulation cannot decode ${cmd}"
     }
 }
 
 def zwaveEvent(physicalgraph.zwave.commands.batteryv1.BatteryReport cmd) {
-    return createEvent(name:"battery", value: cmd.batteryLevel)
+	log.trace "Battery repoty $cmd"
+	def map = [ name: "battery", unit: "%" ]
+	if (cmd.batteryLevel == 0xFF) {
+		map.value = 1
+		map.descriptionText = "${device.displayName} battery is low"
+		map.isStateChange = true
+	} else {
+		map.value = cmd.batteryLevel
+	}
+	state.lastbatt = now()
+	createEvent(map)
 }
+
 
 def zwaveEvent(physicalgraph.zwave.commands.wakeupv2.WakeUpNotification cmd) {
     log.debug "WakeUpNotification v2 ${cmd}"
@@ -274,9 +321,37 @@ def zwaveEvent(physicalgraph.zwave.commands.wakeupv2.WakeUpNotification cmd) {
         cmds += configCmds()
         state.configRequired = false
     }
-    cmds += zwave.wakeUpV2.wakeUpNoMoreInformation().format()
-    cmds = delayBetween(cmds, 600)
+    cmds += zwave.wakeUpV2.wakeUpNoMoreInformation()
+    cmds = commands(cmds, 600)
     return [response(cmds)]
+}
+
+
+def zwaveEvent(physicalgraph.zwave.commands.securityv1.SecurityCommandsSupportedReport cmd) {
+	log.debug "---SECURITY COMMANDS SUPPORTED REPORT V1--- ${device.displayName} sent commandClassControl: ${cmd.commandClassControl}, commandClassSupport: ${cmd.commandClassSupport}, reportsToFollow: ${cmd.reportsToFollow}"
+	//response(configure())
+}
+
+def zwaveEvent(physicalgraph.zwave.commands.manufacturerspecificv2.DeviceSpecificReport cmd) {
+	log.debug "---MANUFACTURER SPECIFIC REPORT V2--- ${device.displayName} sent deviceIdDataFormat: ${cmd.deviceIdDataFormat}, deviceIdDataLengthIndicator: ${cmd.deviceIdDataLengthIndicator}, deviceIdType: ${cmd.deviceIdType}, payload: ${cmd.payload}"
+}
+
+def zwaveEvent(physicalgraph.zwave.commands.versionv1.VersionCommandClassReport cmd) {
+	log.debug "---COMMAND CLASS VERSION REPORT V1--- ${device.displayName} has command class version: ${cmd.commandClassVersion} - payload: ${cmd.payload}"
+}
+
+def zwaveEvent(physicalgraph.zwave.commands.versionv1.VersionReport cmd) {
+	def fw = "${cmd.applicationVersion}.${cmd.applicationSubVersion}"
+	updateDataValue("fw", fw)
+	log.debug "---VERSION REPORT V1--- ${device.displayName} is running firmware version: $fw, Z-Wave version: ${cmd.zWaveProtocolVersion}.${cmd.zWaveProtocolSubVersion}"
+}
+
+def zwaveEvent(physicalgraph.zwave.commands.configurationv1.ConfigurationReport cmd) {
+    log.debug "---CONFIGURATION REPORT V1--- ${device.displayName} parameter ${cmd.parameterNumber} with a byte size of ${cmd.size} is set to ${cmd.configurationValue}"
+}
+
+def zwaveEvent(physicalgraph.zwave.commands.configurationv2.ConfigurationReport cmd) {
+    log.debug "---CONFIGURATION REPORT V2--- ${device.displayName} parameter ${cmd.parameterNumber} with a byte size of ${cmd.size} is set to ${cmd.configurationValue}"
 }
 
 def zwaveEvent(physicalgraph.zwave.Command cmd) {
@@ -298,15 +373,27 @@ def installed() {
 
 def configure() {
     state.sec = 1
-    delayBetween( configCmds() + readSensors(), 600)
+    commands( configCmds() + readSensors(), 600)
 }
 
+
 def readSensors() {
-    [
-        secure(zwave.sensorMultilevelV5.sensorMultilevelGet(sensorType:3)), // light
-        secure(zwave.sensorMultilevelV5.sensorMultilevelGet(sensorType:5)), // humidity
-        secure(zwave.sensorMultilevelV5.sensorMultilevelGet(sensorType:1)), // temp
+	[
+        zwave.sensorMultilevelV5.sensorMultilevelGet(sensorType:3), // light
+        zwave.sensorMultilevelV5.sensorMultilevelGet(sensorType:5), // humidity
+        zwave.sensorMultilevelV5.sensorMultilevelGet(sensorType:1), // temp
+        zwave.batteryV1.batteryGet(),
     ]
+}
+def secure(cmd) {
+	if (state.sec) {
+    	return zwave.securityV1.securityMessageEncapsulation().encapsulate(cmd).format()
+    } else {
+    	return cmd.format()
+    }
+}
+private commands(commands, delay=200) {
+	delayBetween(commands.collect{ secure(it) }, delay)
 }
 
 def getWakeIntervalPref() {
@@ -343,17 +430,19 @@ def configCmds() {
     log.debug "configure, pirSensitivityPref:${pirSensitivityPref} ledModePref:${ledModePref}" 
     log.debug "configure, wakeIntervalPref:${wakeIntervalPref}"
     def cmds = [
-        secure(zwave.batteryV1.batteryGet()),
-        secure(zwave.associationV2.associationSet(groupingIdentifier:1, nodeId:zwaveHubNodeId)),
+        zwave.batteryV1.batteryGet(),
+        zwave.associationV2.associationSet(groupingIdentifier:1, nodeId:zwaveHubNodeId),
 
-        secure(zwave.configurationV1.configurationSet(scaledConfigurationValue: tempAlertPref, parameterNumber: 2)),
-        secure(zwave.configurationV1.configurationSet(scaledConfigurationValue: humidityAlertPref, parameterNumber: 3)),
-        secure(zwave.configurationV1.configurationSet(scaledConfigurationValue: illumAlertPref, parameterNumber: 4)),
-        secure(zwave.configurationV1.configurationSet(scaledConfigurationValue: pirTimeoutPref, parameterNumber: 5)),
-        secure(zwave.configurationV1.configurationSet(scaledConfigurationValue: pirSensitivityPref, parameterNumber: 6)),
-        secure(zwave.configurationV1.configurationSet(scaledConfigurationValue: ledModePref, parameterNumber: 7)),
+        zwave.configurationV1.configurationSet(scaledConfigurationValue: tempAlertPref, parameterNumber: 2),
+        zwave.configurationV1.configurationSet(scaledConfigurationValue: humidityAlertPref, parameterNumber: 3),
+        zwave.configurationV1.configurationSet(scaledConfigurationValue: illumAlertPref, parameterNumber: 4),
+        zwave.configurationV1.configurationSet(scaledConfigurationValue: pirTimeoutPref, parameterNumber: 5),
+        zwave.configurationV1.configurationSet(scaledConfigurationValue: pirSensitivityPref, parameterNumber: 6),
+        zwave.configurationV1.configurationSet(scaledConfigurationValue: ledModePref, parameterNumber: 7),
 
-        secure(zwave.wakeUpV2.wakeUpIntervalSet(seconds: wakeIntervalPref, nodeid:zwaveHubNodeId)),
+        zwave.wakeUpV2.wakeUpIntervalSet(seconds: wakeIntervalPref, nodeid:zwaveHubNodeId),
+        zwave.versionV1.versionGet(),
+        zwave.firmwareUpdateMdV2.firmwareMdGet(),
         
 /*
         secure(zwave.configurationV1.configurationGet(parameterNumber: 1)), // Temp scale C(0) or F(1)
@@ -370,12 +459,4 @@ def configCmds() {
         
     ]
     return cmds
-}
-
-def secure(cmd) {
-	if (state.sec) {
-    	return zwave.securityV1.securityMessageEncapsulation().encapsulate(cmd).format()
-    } else {
-    	return cmd.format()
-    }
 }
