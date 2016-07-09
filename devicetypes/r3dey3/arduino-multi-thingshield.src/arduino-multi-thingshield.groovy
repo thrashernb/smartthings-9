@@ -17,6 +17,8 @@ metadata {
 		fingerprint profileId: "0104", deviceId: "0138", inClusters: "0000"
 		capability "Switch"
         command "send", ["string"]
+        command "notify", ["string","string"]
+        command "settingsMap"
 	}
 
 	// Simulator metadata
@@ -35,6 +37,7 @@ metadata {
 		main "shield"
 		details "shield"
 	}
+    
 }
 
 // Parse incoming device messages to generate events
@@ -53,3 +56,10 @@ def send(String text) {
 
 def on() {}
 def off() {}
+
+def notify(String arg1, Stringarg2) {
+	log.trace "notify($arg1, $arg2)"
+}
+def settingsMap(arg1, arg2) {
+	log.trace "settingsMap($arg1,$arg2)"
+}

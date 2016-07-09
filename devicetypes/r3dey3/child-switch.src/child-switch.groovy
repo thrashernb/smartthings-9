@@ -17,6 +17,7 @@ metadata {
 	definition (name: "Child Switch", namespace: "r3dey3", author: "Kenny Keslar") {
 		capability "Switch"
         capability "Refresh"
+        capability "Polling"
         
 	}
 
@@ -58,5 +59,10 @@ def off() {
 
 def refresh() {
 	log.debug "Executing ${device.name} 'refresh'"
+	parent.refresh()
+}
+
+def poll() {
+	log.debug "Executing ${device.name} 'poll'"
 	parent.refresh()
 }
