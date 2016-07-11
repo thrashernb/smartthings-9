@@ -113,15 +113,16 @@ def timesPage() {
 
 def installed() {
     scheduling()
-    state.daysSinceLastWatering = [1000,1000,1000]
+    atomicState.daysSinceLastWatering = [1000,1000,1000]
 }
 
 def updated() {
+    log.trace "updated()"
     unschedule()
     scheduling()
-    state.daysSinceLastWatering = [1000,1000,1000]
-    state.currentTimerIx = 0
-    state.currentZone = settings.numZones
+    atomicState.daysSinceLastWatering = [1000,1000,1000]
+    //atomicState.currentTimerIx = 0
+    atomicState.currentZone = settings.numZones
     //scheduleCheck()
 }
 
@@ -135,21 +136,22 @@ def scheduling() {
     if (waterTimeThree) {
         schedule(waterTimeThree, "waterTimeThreeStart")
     }
+    //startWatering()
 }
 
 def waterTimeOneStart() {
     log.info "Time 1"
-    state.currentTimerIx = 0
+    atomicState.currentTimerIx = 0
     scheduleCheck()
 }
 def waterTimeTwoStart() {
     log.info "Time 0"
-    state.currentTimerIx = 1
+    atomicState.currentTimerIx = 1
     scheduleCheck()
 }
 def waterTimeThreeStart() {
     log.info "Time 3"
-    state.currentTimerIx = 2
+    atomicState.currentTimerIx = 2
     scheduleCheck()
 }
 
@@ -189,12 +191,12 @@ def scheduleCheck() {
         if (isNotificationEnabled) {
         	sendPush("${app.label} Is Watering Now!" ?: "null pointer on app name")
         }
-        state.daysSinceLastWatering[state.currentTimerIx] = 0
+        atomicState.daysSinceLastWatering[atomicState.currentTimerIx] = 0
         startWatering()
     }
     else {
 	    log.info "Not  watering"
-        state.daysSinceLastWatering[state.currentTimerIx] = daysSince() + 1
+        atomicState.daysSinceLastWatering[atomicState.currentTimerIx] = daysSince() + 1
     }
 }
 
@@ -215,10 +217,10 @@ def enoughTimeElapsed(schedulerState) {
 }
 
 def daysSince() {
-    if(state.daysSinceLastWatering == null) 
-    	state.daysSinceLastWatering = [1000,1000,1000];
+    if(atomicState.daysSinceLastWatering == null) 
+    	atomicState.daysSinceLastWatering = [1000,1000,1000];
 
-    return state.daysSinceLastWatering[state.currentTimerIx]
+    return atomicState.daysSinceLastWatering[atomicState.currentTimerIx]
 }
 
 def isWeatherDelay() { 
@@ -313,30 +315,46 @@ def isHot() {
 }
 
 def startWatering() {
-	if (state.currentZone != null && state.currentZone != settings.numZones) {
+	if (atomicState.currentZone != null && atomicState.currentZone < settings.numZones) {
     	log.debug "Not watering because schedule in progress"
     	return;
     }
-    state.currentZone = -1;
+    log.debug "Saving -1 as current zone"
+    atomicState.currentZone = -1;
     nextZone();
 }
 def nextZone() {
-	def curZone = state.currentZone
+	log.trace "nextZone() - ${atomicState.currentZone}"
+	def curZone = atomicState.currentZone
+    /*
     if (curZone >= 0) {
         log.debug "Turn off"
     	settings["zone${curZone}"].off()
-    }
+    }*/
     curZone = curZone + 1
     while (curZone < settings.numZones) {
+    	log.debug "Check zone $curZone"
         def dev = settings["zone${curZone}"]
         def t = settings["zone${curZone}time"]
         if (t > 0) {
             dev.on()
-            runIn(t*60, "nextZone");
+            runIn(t*60, "endZone");
             log.debug("Start watering with ${dev} for $t minutes");
             break;
         }
     	curZone = curZone + 1
 	}
-    state.currentZone = curZone
+    if (curZone <= settings.numZones) {
+    	log.debug "Saving $curZone"
+    	atomicState.currentZone = curZone
+    }
 }
+def endZone() {
+	log.trace "endZone() - ${atomicState.currentZone}"
+	def curZone = atomicState.currentZone
+	def dev = settings["zone${curZone}"]
+    log.debug "Turning $dev off"
+	dev.off()
+    runIn(30, "nextZone")
+}
+
