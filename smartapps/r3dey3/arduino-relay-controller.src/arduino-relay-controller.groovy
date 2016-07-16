@@ -39,8 +39,6 @@ def relaySetup() {
 }
 
 def installed() {
-    atomicState.relayState = ["0","0","0","0","0","0","0","0"]
-    
 	log.debug "Installed with settings: ${settings}"
 	initialize()
 }
@@ -101,18 +99,12 @@ def uninstalled() {
     //removeChildDevices(getChildDevices())
 }
 def on(child) {
-	def idx = child.getDataValue('idx')
-    def relayState = atomicState.relayState
-    relayState[idx.toInteger()] = "1"
-    atomicState.relayState = relayState
+	def idx = child.getDataValue('idx').toInteger()
     arduino.send("R${idx}1Q")
     runIn(20, refresh);
 }
 def off(child) {
-	def idx = child.getDataValue('idx')
-    def relayState = atomicState.relayState
-    relayState[idx.toInteger()] = "0"
-    atomicState.relayState = relayState
+	def idx = child.getDataValue('idx').toInteger()
     arduino.send("R${idx}0Q")
     runIn(20, refresh);
 }
@@ -130,7 +122,6 @@ def statusUpdate(evt)
 	def idx = 0
     
     if (evt.value == null) return
-    def relayState = atomicState.relayState
     
     while (idx < evt.value.length()) {
     	if (val[idx] == 'R') {
@@ -140,7 +131,6 @@ def statusUpdate(evt)
                 def curVal = val[idx].toInteger()
                 if (child) {
 	                def strVal = curVal?"on":"off"
-                    relayState[i] = curVal
                 	log.debug "Sending $child ${strVal}"
                 	child.sendEvent(name:"switch", value: strVal)
                 }
@@ -151,5 +141,4 @@ def statusUpdate(evt)
         }
         idx++
     }
-    atomicState.relayState = relayState
 }
