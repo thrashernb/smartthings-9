@@ -120,9 +120,9 @@ def updated() {
     log.trace "updated()"
     unschedule()
     scheduling()
-    atomicState.daysSinceLastWatering = [1000,1000,1000]
+    //atomicState.daysSinceLastWatering = [1000,1000,1000]
     //atomicState.currentTimerIx = 0
-    atomicState.currentZone = settings.numZones
+    //atomicState.currentZone = settings.numZones
     //scheduleCheck()
 }
 
@@ -222,7 +222,7 @@ def daysSince() {
 
     return atomicState.daysSinceLastWatering[atomicState.currentTimerIx]
 }
-
+/*
 def isWeatherDelay() { 
 	log.info "${app.label} Is Checking The Weather"
     if (zipcode) {
@@ -247,13 +247,7 @@ def isWeatherDelay() {
                 sendPush("Skipping watering today due to precipitation.")
             }
             log.info "${app.label} skipping watering today due to precipitation."
-            /*
-            for(s in switches) {
-                if("rainDelayed" in s.supportedCommands.collect { it.name }) {
-                    s.rainDelayed()
-                    log.info "Watering is rain delayed for $s"
-                }
-            }*/
+
             return true
         }
         
@@ -281,7 +275,7 @@ def wasWetYesterday() {
     def yesterdaysPrecip=yesterdaysWeather.history.dailysummary.precipi.toArray()
     def yesterdaysInches=safeToFloat(yesterdaysPrecip[0])
     log.info("Checking yesterday's percipitation for $zipcode: $yesterdaysInches in")
-    */
+    
 	return 0
 }
 
@@ -301,7 +295,7 @@ def isStormy() {
     def forecastInches=(forecastPrecip[0])
     log.info("Checking forecast percipitation for $zipcode: $forecastInches in")
     return forecastInches
-    */
+    
     return 0
 }
 
@@ -313,7 +307,7 @@ def isHot() {
     log.info("Checking forecast high temperature for $zipcode: $todaysHighTemp F")
     return todaysHighTemp
 }
-
+*/
 def startWatering() {
 	if (atomicState.currentZone != null && atomicState.currentZone < settings.numZones) {
     	log.debug "Not watering because schedule in progress"
@@ -326,11 +320,6 @@ def startWatering() {
 def nextZone() {
 	log.trace "nextZone() - ${atomicState.currentZone}"
 	def curZone = atomicState.currentZone
-    /*
-    if (curZone >= 0) {
-        log.debug "Turn off"
-    	settings["zone${curZone}"].off()
-    }*/
     curZone = curZone + 1
     while (curZone < settings.numZones) {
     	log.debug "Check zone $curZone"
@@ -339,6 +328,7 @@ def nextZone() {
         if (t > 0) {
             dev.on()
             runIn(t*60, "endZone");
+            runIn(30, "ensureOn");
             log.debug("Start watering with ${dev} for $t minutes");
             break;
         }
@@ -348,6 +338,13 @@ def nextZone() {
     	log.debug "Saving $curZone"
     	atomicState.currentZone = curZone
     }
+}
+def ensureOn() {
+	log.trace "ensureOn() - ${atomicState.currentZone}"
+	def curZone = atomicState.currentZone
+	def dev = settings["zone${curZone}"]
+    log.debug "Turning $dev on"
+	dev.on()
 }
 def endZone() {
 	log.trace "endZone() - ${atomicState.currentZone}"
