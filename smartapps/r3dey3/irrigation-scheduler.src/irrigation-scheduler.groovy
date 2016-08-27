@@ -55,34 +55,12 @@ preferences {
 
         section("Start watering at what times...") {
             input name: "waterTimeOne",  type: "time", required: true, title: "Turn them on at..."
-            input name: "waterTimeTwo",  type: "time", required: false, title: "and again at..."
-            input name: "waterTimeThree",  type: "time", required: false, title: "and again at..."
         }
 
     }
     
 	page(name: "zonePage", title: "Select sprinkler switches", nextPage:"timesPage")
-	page(name: "timesPage", title: "Select zone run times", nextPage: "weatherPage")
-    
-	page(name: "weatherPage", title: "Virtual Weather Station Setup", install: true) {
-        section("Zip code or Weather Station ID to check weather...") {
-            input "zipcode", "text", title: "Enter zipcode or or pws:stationid", required: false
-        }
-        
-        section("Select which rain to add to your virtual rain guage...") {
-        	input "isYesterdaysRainEnabled", "boolean", title: "Yesterday's Rain", description: "Include?", defaultValue: "true", required: false
-        	input "isTodaysRainEnabled", "boolean", title: "Today's Rain", description: "Include?", defaultValue: "true", required: false
-        	input "isForecastRainEnabled", "boolean", title: "Today's Forecasted Rain", description: "Include?", defaultValue: "false", required: false
-        }
-       
-       	section("Skip watering if virutal rain guage totals more than... (default 0.5)") {
-            input "wetThreshold", "decimal", title: "Inches?", defaultValue: "0.5", required: false
-        }
-        
-        section("Run watering only if forecasted high temp (F) is greater than... (default 50)") {
-            input "tempThreshold", "decimal", title: "Temp?", defaultValue: "50", required: false
-        }
-    }
+	page(name: "timesPage", title: "Select zone run times", install: true)
 }		
 
 
@@ -113,90 +91,87 @@ def timesPage() {
 
 def installed() {
     scheduling()
-    atomicState.daysSinceLastWatering = [1000,1000,1000]
 }
-
 def updated() {
     log.trace "updated()"
     unschedule()
     scheduling()
-    //atomicState.daysSinceLastWatering = [1000,1000,1000]
-    //atomicState.currentTimerIx = 0
-    //atomicState.currentZone = settings.numZones
-    //scheduleCheck()
 }
-
 // Scheduling
 def scheduling() {
 	log.debug "Scheduling"
-    schedule(waterTimeOne, "waterTimeOneStart")
-    if (waterTimeTwo) {
-        schedule(waterTimeTwo, "waterTimeTwoStart")
-    }
-    if (waterTimeThree) {
-        schedule(waterTimeThree, "waterTimeThreeStart")
-    }
-    //startWatering()
+    schedule(waterTimeOne, scheduleCheck)
 }
 
-def waterTimeOneStart() {
-    log.info "Time 1"
-    atomicState.currentTimerIx = 0
-    scheduleCheck()
+def updateCtrl(newState) {
+	def ctrl = getCtrl()
+    newState.each {
+        ctrl.sendEvent(name: it.key, value: it.value)
+    }
+	//getCtrl()?.update(newState)
 }
-def waterTimeTwoStart() {
-    log.info "Time 0"
-    atomicState.currentTimerIx = 1
-    scheduleCheck()
+
+
+def getCtrl() {
+	def child = getChildDevice("irgctrl")
+    if (child) {
+   		return child;
+    }
+    log.debug "Creating child"
+    addChildDevice("r3dey3", "Irrigation Control", "irgctrl", hub, [
+        "label": "Irrigation Control"
+    ])
+    def d = new Date()
+    d.clearTime()
+    child = getChildDevice("irgctrl")
+    updateCtrl(["date":d])
+    return child
 }
-def waterTimeThreeStart() {
-    log.info "Time 3"
-    atomicState.currentTimerIx = 2
-    scheduleCheck()
+
+def nextDate() {
+	def ctrl = getCtrl()
+    def cur = getDate(ctrl)
+	cur = cur.plus(1)
+    updateCtrl(["date": cur.format("EEE MMM dd yyyy")])
+}
+def prevDate() {
+	def ctrl = getCtrl()
+    def cur = getDate(ctrl)
+    def today = (new Date()).clearTime()
+    if (cur > today) {
+    	cur = cur.minus(1)
+    }
+    updateCtrl(["date": cur.format("EEE MMM dd yyyy")])
+}
+def getDate(ctrl) {
+    def cur = ctrl.currentState("date")?.value
+    if (cur) {
+    	cur = Date.parse("EEE MMM dd yyyy", cur)
+    }
+    else {
+    	cur = (new Date()).clearTime()
+    }
+    return cur
 }
 
 def scheduleCheck() {
-    log.info "Running Irrigation Schedule: ${app.label}"
-/*
-    def schedulerState = switches?.latestValue("effect")?.toString() ?:"[noEffect]"
-
-    if (schedulerState == "onHold") {
-        log.info("${app.label} sprinkler schedule on hold.")
-        return
-    } 
+    ctrl.log "Running Irrigation Schedule: ${app.label}"
+    def ctrl = getCtrl()
+    def today = (new Date()).clearTime()
+    def cur = getDate(ctrl)
     
-	if (schedulerState == "skip") { 
-    	// delay this watering and reset device.effect to noEffect
-        schedulerState = "delay" 
-        for(s in switches) {
-            if("noEffect" in s.supportedCommands.collect { it.name }) {
-                s.noEffect()
-                log.info ("${app.label} skipped one watering and will resume normal operations at next scheduled time")
-            }
-        }
- 	}    
-    
-	if (schedulerState != "expedite") { 
-    	// Change to delay if wet or too cold
-        schedulerState = isWeatherDelay() ? "delay" : schedulerState
- 	}
-
-    if (schedulerState != "delay") {
-        state.daysSinceLastWatering[state.currentTimerIx] = daysSince() + 1
-    }*/
-
-//    log.info("${app.label} scheduler state: $schedulerState. Days since last watering: ${daysSince()}. Is watering day? ${isWateringDay()}. Enought time? ${enoughTimeElapsed(schedulerState)} ")
-
-    if (enoughTimeElapsed(schedulerState) && isWateringDay()) {
+    if (today >= cur && ctrl.currentState("enabled").value == "on" && isWateringDay()) {
         if (isNotificationEnabled) {
-        	sendPush("${app.label} Is Watering Now!" ?: "null pointer on app name")
+        	sendPush("${app.label} Is Watering Now!" ?: "Irrigation schedule is watering")
         }
-        atomicState.daysSinceLastWatering[atomicState.currentTimerIx] = 0
         startWatering()
+        def next = today.plus(settings.days)
+        ctrl.log("NEW DATE $next")
+        updateCtrl(["date": next.format("EEE MMM dd yyyy")])
     }
     else {
-	    log.info "Not  watering"
-        atomicState.daysSinceLastWatering[atomicState.currentTimerIx] = daysSince() + 1
+	    ctrl.log "Not  watering"
+        updateCtrl(["state":"scheduled"])
     }
 }
 
@@ -211,103 +186,6 @@ def isWateringDay() {
     return false
 }
 
-def enoughTimeElapsed(schedulerState) {
-    if(!days) return true
-    return (daysSince() >= days)
-}
-
-def daysSince() {
-    if(atomicState.daysSinceLastWatering == null) 
-    	atomicState.daysSinceLastWatering = [1000,1000,1000];
-
-    return atomicState.daysSinceLastWatering[atomicState.currentTimerIx]
-}
-/*
-def isWeatherDelay() { 
-	log.info "${app.label} Is Checking The Weather"
-    if (zipcode) {
-        //add rain to virtual rain guage
-        def rainGauge = 0
-        if (isYesterdaysRainEnabled) {        
-            rainGauge = rainGauge + wasWetYesterday()
-        }
-
-        if (isTodaysRainEnabled) {
-            rainGauge = rainGauge + isWet()
-        }
-
-        if (isForecastRainEnabled) {
-            rainGauge = rainGauge + isStormy()
-        }
-        log.info ("Virtual rain gauge reads $rainGauge in")
-        
- //     check to see if virtual rainguage exceeds threshold
-        if (rainGauge > (wetThreshold?.toFloat() ?: 0.5)) {
-            if (isNotificationEnabled) {
-                sendPush("Skipping watering today due to precipitation.")
-            }
-            log.info "${app.label} skipping watering today due to precipitation."
-
-            return true
-        }
-        
-        def maxThermometer = isHot()
-        if (maxThermometer < (tempThreshold?.toFloat() ?: 0)) {
-        	if (isNotificationEnabled.equals("true")) {
-                sendPush("Skipping watering: temp is below threshold temp.")
-            }
-            log.info "${app.label} is skipping watering: temp is below threshold temp."
-            return true
-		}
-     }
-    return false
-}
-
-def safeToFloat(value) {
-    if(value && value.isFloat()) return value.toFloat()
-    return 0.0
-}
-
-def wasWetYesterday() {
-    def yesterdaysWeather = getWeatherFeature("yesterday", zipcode)
-    log.debug yesterdaysWeather
-/*
-    def yesterdaysPrecip=yesterdaysWeather.history.dailysummary.precipi.toArray()
-    def yesterdaysInches=safeToFloat(yesterdaysPrecip[0])
-    log.info("Checking yesterday's percipitation for $zipcode: $yesterdaysInches in")
-    
-	return 0
-}
-
-
-def isWet() {
-
-    def todaysWeather = getWeatherFeature("conditions", zipcode)
-    def todaysInches = safeToFloat(todaysWeather.current_observation.precip_today_in)
-    log.info("Checking today's percipitation for $zipcode: $todaysInches in")
-    return todaysInches
-}
-
-def isStormy() {
-/*
-    def forecastWeather = getWeatherFeature("forecast", zipcode)
-    def forecastPrecip=forecastWeather.forecast.simpleforecast.forecastday.qpf_allday.in.toArray()
-    def forecastInches=(forecastPrecip[0])
-    log.info("Checking forecast percipitation for $zipcode: $forecastInches in")
-    return forecastInches
-    
-    return 0
-}
-
-def isHot() {
-
-    def forecastWeather = getWeatherFeature("forecast", zipcode)
-    def todaysTemps=forecastWeather.forecast.simpleforecast.forecastday.high.fahrenheit.toArray()
-    def todaysHighTemp=(todaysTemps[0]).toFloat()
-    log.info("Checking forecast high temperature for $zipcode: $todaysHighTemp F")
-    return todaysHighTemp
-}
-*/
 def startWatering() {
 	if (atomicState.currentZone != null && atomicState.currentZone < settings.numZones) {
     	log.debug "Not watering because schedule in progress"
@@ -320,13 +198,16 @@ def startWatering() {
 def nextZone() {
 	log.trace "nextZone() - ${atomicState.currentZone}"
 	def curZone = atomicState.currentZone
+    ensureOff();
+    
     curZone = curZone + 1
     while (curZone < settings.numZones) {
     	log.debug "Check zone $curZone"
         def dev = settings["zone${curZone}"]
         def t = settings["zone${curZone}time"]
         if (t > 0) {
-            dev.on()
+		    updateCtrl(["state":"watering"])
+            dev?.on()
             runIn(t*60, "endZone");
             runIn(30, "ensureOn");
             log.debug("Start watering with ${dev} for $t minutes");
@@ -334,24 +215,44 @@ def nextZone() {
         }
     	curZone = curZone + 1
 	}
-    if (curZone <= settings.numZones) {
-    	log.debug "Saving $curZone"
-    	atomicState.currentZone = curZone
+    if (curZone >= settings.numZones) {
+        updateCtrl(["state":"scheduled"])
     }
+    atomicState.currentZone = curZone
+
 }
 def ensureOn() {
-	log.trace "ensureOn() - ${atomicState.currentZone}"
+	log.debug "ensureOn() - ${atomicState.currentZone}"
 	def curZone = atomicState.currentZone
 	def dev = settings["zone${curZone}"]
     log.debug "Turning $dev on"
-	dev.on()
+	dev?.on()
 }
+
+def ensureOff() {
+	log.debug "ensureOff() - ${atomicState.offZone}"
+	def curZone = atomicState.offZone
+    def dev = settings["zone${curZone}"]
+    log.debug "Turning $dev off"
+    dev?.off()
+    atomicState.offZone = -1
+}
+
 def endZone() {
 	log.trace "endZone() - ${atomicState.currentZone}"
 	def curZone = atomicState.currentZone
 	def dev = settings["zone${curZone}"]
+    atomicState.offZone = curZone
     log.debug "Turning $dev off"
-	dev.off()
+	dev?.off()
     runIn(30, "nextZone")
 }
 
+
+def stop() {
+	endZone()
+	atomicState.currentZone = settings.numZones
+}
+def start() {
+	scheduleCheck();
+}
