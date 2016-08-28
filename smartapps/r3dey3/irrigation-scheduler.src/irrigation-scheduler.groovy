@@ -189,6 +189,7 @@ def isWateringDay() {
 def startWatering() {
 	if (atomicState.currentZone != null && atomicState.currentZone < settings.numZones) {
     	log.debug "Not watering because schedule in progress"
+        getCtrl().log "Not watering because schedule in progress"
     	return;
     }
     log.debug "Saving -1 as current zone"
@@ -198,7 +199,13 @@ def startWatering() {
 def nextZone() {
 	log.trace "nextZone() - ${atomicState.currentZone}"
 	def curZone = atomicState.currentZone
-    ensureOff();
+    def curDev = settings["zone${curZone}"]
+    
+    if (curDev?.currentState("switch")?.value == "on") {
+    	curDev.off();
+        runIn(30, nextZone);
+        return;
+    }
     
     curZone = curZone + 1
     while (curZone < settings.numZones) {
@@ -215,6 +222,7 @@ def nextZone() {
         }
     	curZone = curZone + 1
 	}
+    
     if (curZone >= settings.numZones) {
         updateCtrl(["state":"scheduled"])
     }
@@ -225,34 +233,46 @@ def ensureOn() {
 	log.debug "ensureOn() - ${atomicState.currentZone}"
 	def curZone = atomicState.currentZone
 	def dev = settings["zone${curZone}"]
-    log.debug "Turning $dev on"
-	dev?.on()
-}
-
-def ensureOff() {
-	log.debug "ensureOff() - ${atomicState.offZone}"
-	def curZone = atomicState.offZone
-    def dev = settings["zone${curZone}"]
-    log.debug "Turning $dev off"
-    dev?.off()
-    atomicState.offZone = -1
+    if (dev?.currentState("switch")?.value != "on") {
+        log.debug "Turning $dev on"
+        dev?.on()
+        runIn(30, "ensureOn");
+    }
 }
 
 def endZone() {
 	log.trace "endZone() - ${atomicState.currentZone}"
 	def curZone = atomicState.currentZone
 	def dev = settings["zone${curZone}"]
-    atomicState.offZone = curZone
     log.debug "Turning $dev off"
 	dev?.off()
     runIn(30, "nextZone")
 }
 
+def doStop() {
+	def stopZone = atomicState.stopZone
+	def dev = settings["zone${stopZone}"]
+    if (dev) {
+    	if (dev.currentState("switch").value == "on") {
+        	dev.off()
+            runIn(10, doStop)
+        }
+        else {
+        	updateCtrl(["state":"scheduled"])
+        }
+    }
+    else {
+    	updateCtrl(["state":"scheduled"])
+    }
+}
 
 def stop() {
-	endZone()
+	def curZone = atomicState.currentZone
+    atomicState.stopZone = curZone
 	atomicState.currentZone = settings.numZones
+	doStop();
 }
 def start() {
+	atomicState.currentZone = 10000;
 	scheduleCheck();
 }
