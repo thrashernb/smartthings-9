@@ -49,7 +49,7 @@ def parse(description) {
     def msg = parseLanMessage(description)
     def json = msg.json
     log.trace "MESSAGE Result: $msg"
-    if (msg.status == 200 || msg.header.startsWith('NOTIFY')) {
+    if (msg.status == 200 || msg.header.startsWith('POST')) {
     	log.debug "JSON Result: $json"
         json.each {
         	def n = it.getKey()
