@@ -55,6 +55,8 @@ metadata {
         	state "val", label:'${currentValue}', defaultState: true
     	}
     }
+    main(["state"])
+	details(["state", "enabled", "prevDate", "nextDate", "date"])
 }
 
 // parse events into attributes
@@ -71,7 +73,7 @@ def update(newState) {
 // handle commands
 def start() {
 	log.debug "Executing 'start'"
-	parent.start()
+	//parent.start()
 }
 
 def stop() {
