@@ -108,7 +108,7 @@ def updateCtrl(newState) {
     newState.each {
         ctrl.sendEvent(name: it.key, value: it.value)
     }
-	//getCtrl()?.update(newState)
+	//ctrl.update(newState)
 }
 
 
@@ -164,10 +164,10 @@ def scheduleCheck() {
         if (isNotificationEnabled) {
         	sendPush("${app.label} Is Watering Now!" ?: "Irrigation schedule is watering")
         }
-        startWatering()
         def next = today.plus(settings.days)
-        ctrl.log("NEW DATE $next")
+        //ctrl.log("NEW DATE $next")
         updateCtrl(["date": next.format("EEE MMM dd yyyy")])
+        startWatering()
     }
     else {
 	    ctrl.log "Not  watering"
@@ -233,20 +233,24 @@ def ensureOn() {
 	log.debug "ensureOn() - ${atomicState.currentZone}"
 	def curZone = atomicState.currentZone
 	def dev = settings["zone${curZone}"]
-    if (dev?.currentState("switch")?.value != "on") {
-        log.debug "Turning $dev on"
-        dev?.on()
-        runIn(30, "ensureOn");
+    if (dev) {
+        if (dev.currentState("switch").value != "on") {
+            log.debug "Turning $dev on"
+            dev.on()
+            runIn(30, "ensureOn");
+        }
     }
 }
 
 def endZone() {
-	log.trace "endZone() - ${atomicState.currentZone}"
+	log.debug "endZone() - ${atomicState.currentZone}"
 	def curZone = atomicState.currentZone
 	def dev = settings["zone${curZone}"]
-    log.debug "Turning $dev off"
-	dev?.off()
-    runIn(30, "nextZone")
+    if (dev) {
+    	log.debug "Turning $dev off"
+		dev.off()
+    }
+    runIn(60, "nextZone")
 }
 
 def doStop() {
