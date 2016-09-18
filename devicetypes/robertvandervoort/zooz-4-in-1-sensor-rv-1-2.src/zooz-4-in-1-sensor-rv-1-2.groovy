@@ -129,7 +129,7 @@
            	state "humidity",label:'RH ${currentValue}%', precision:2
 			}
 		valueTile("illuminance","device.illuminance", width: 2, height: 2) {
-            	state "luminosity",label:'LIGHT ${currentValue}%', precision:2
+            	state "illuminance",label:'LIGHT ${currentValue}%', precision:2
 			}
 		standardTile("acceleration", "device.acceleration", width: 2, height: 2) {
 			state("active", label:'tamper', icon:"st.motion.acceleration.active", backgroundColor:"#ff0000")
